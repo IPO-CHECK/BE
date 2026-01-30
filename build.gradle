@@ -4,19 +4,13 @@ plugins {
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'com.koscom.team5'
+group = 'financial'
 version = '0.0.1-SNAPSHOT'
-description = 'IPO CHECK'
+description = 'financial'
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
-}
-
-configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 

@@ -1,8 +1,8 @@
-package com.hangangKo.isp.listedcorp.controller;
+package financial.dart.Test;
 
-import com.hangangKo.isp.listedcorp.service.KindListedCorpImportService;
-import com.hangangKo.isp.listedcorp.service.dto.ImportResultDto;
-import com.hangangKo.isp.listedcorp.service.dto.KindCorpDownloadRequestDto;
+import financial.dart.Test.ImportResultDto;
+import financial.dart.Test.KindCorpDownloadRequestDto;
+import financial.dart.Test.KindListedCorpImportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +21,7 @@ public class KindListedCorpController {
      * - KIND에서 상장법인목록 "엑셀(실제 HTML)" 다운로드
      * - 파싱 후 DB 적재
      */
-    @PostMapping("/import")
+    @GetMapping("/import")
     public ResponseEntity<ImportResultDto> importCorps(@RequestBody(required = false) KindCorpDownloadRequestDto reqDto) {
         ImportResultDto result = importService.downloadParseAndSave(reqDto);
         return ResponseEntity.ok(result);
