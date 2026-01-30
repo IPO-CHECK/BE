@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ipo-check-test?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: rootroot
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+# DART(전자공시) Open API 인증키
+# https://opendart.fss.or.kr 에서 발급
+dart:
+  api-key: ${DART_API_KEY:}
