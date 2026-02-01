@@ -1,0 +1,10 @@
+package financial.dart.ListedCorp;
+
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface ListedCorpRepository extends JpaRepository<ListedCorp, Long> {
+    Optional<ListedCorp> findByCorpCode(String corpCode);
+}
