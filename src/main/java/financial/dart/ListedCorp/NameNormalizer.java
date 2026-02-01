@@ -1,4 +1,4 @@
-package ListedCorp;
+package financial.dart.ListedCorp;
 
 public class NameNormalizer {
 

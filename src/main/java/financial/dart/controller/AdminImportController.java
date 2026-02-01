@@ -1,4 +1,4 @@
-package financial.dart.ListedCorp;
+package financial.dart.controller;
 
 import financial.dart.service.ListedUniverseImportService;
 import org.springframework.http.ResponseEntity;

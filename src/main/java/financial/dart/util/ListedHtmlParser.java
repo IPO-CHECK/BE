@@ -1,6 +1,7 @@
-package financial.dart.ListedCorp;
+package financial.dart.util;
 
 
+import financial.dart.ListedCorp.ListedRow;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;

@@ -1,4 +1,4 @@
-package ListedCorp;
+package financial.dart.ListedCorp;
 
 public record CorpCodeRow(
         String corpCode,

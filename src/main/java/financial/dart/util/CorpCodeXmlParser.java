@@ -1,5 +1,7 @@
-package financial.dart.ListedCorp;
+package financial.dart.util;
 
+import financial.dart.ListedCorp.CorpCodeRow;
+import financial.dart.ListedCorp.NameNormalizer;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 

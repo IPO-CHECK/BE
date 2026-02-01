@@ -1,4 +1,4 @@
-package financial.dart.ListedCorp;
+package financial.dart.domain;
 
 
 import jakarta.persistence.*;
