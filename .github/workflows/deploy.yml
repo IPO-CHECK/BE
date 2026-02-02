@@ -26,5 +26,5 @@ jobs:
           context: .
           push: true
           tags: |
-            koscom-team5-was:latest
-            koscom-team5-was:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/koscom-team5-was:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/koscom-team5-was:${{ github.sha }}
