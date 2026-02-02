@@ -9,11 +9,7 @@ import financial.dart.vector.dto.SimilarListedCorpResult;
 import financial.dart.vector.util.VectorCodec;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class SimilarListedCorpSearchService {
@@ -32,16 +28,15 @@ public class SimilarListedCorpSearchService {
         this.vectorRepository = vectorRepository;
     }
 
-    public List<SimilarListedCorpResult> search(String businessOverview, Integer topK) {
-        if (businessOverview == null || businessOverview.isBlank()) {
+    public List<SimilarListedCorpResult> search(String text, Integer topK) {
+        if (text == null || text.isBlank()) {
             return List.of();
         }
 
         int limit = (topK == null || topK <= 0) ? DEFAULT_TOP_K : Math.min(topK, 20);
+        float[] queryVector = embeddingClient.embedOne(text.trim());
 
-        float[] queryVector = embeddingClient.embedOne(businessOverview.trim());
         List<ListedCorpVector> vectors = vectorRepository.findAllWithListedCorp();
-
         Map<Long, CorpScore> bestByCorp = new HashMap<>();
 
         for (ListedCorpVector v : vectors) {
@@ -72,7 +67,6 @@ public class SimilarListedCorpSearchService {
         }
 
         results.sort(Comparator.comparingDouble(SimilarListedCorpResult::score).reversed());
-
         if (results.size() > limit) {
             return results.subList(0, limit);
         }

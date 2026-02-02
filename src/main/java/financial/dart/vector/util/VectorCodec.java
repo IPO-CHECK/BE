@@ -27,9 +27,6 @@ public class VectorCodec {
         return Math.sqrt(sum);
     }
 
-    /**
-     * 내적(dot product)
-     */
     public static double dot(float[] a, float[] b) {
         if (a == null || b == null || a.length != b.length) return 0.0;
         double sum = 0.0;
@@ -39,9 +36,6 @@ public class VectorCodec {
         return sum;
     }
 
-    /**
-     * 코사인 유사도 (0~1, 1이 가장 유사)
-     */
     public static double cosineSimilarity(float[] a, float[] b) {
         double normA = l2Norm(a);
         double normB = l2Norm(b);
