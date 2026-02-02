@@ -4,7 +4,7 @@ package financial.dart.domain;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
-@Entity
+@Entity(name = "FinancialListedCorp")
 @Table(name = "listed_corp")
 public class ListedCorp {
 

@@ -5,7 +5,7 @@ spring:
     password: rootroot
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
@@ -15,4 +15,4 @@ spring:
 # DART(전자공시) Open API 인증키
 # https://opendart.fss.or.kr 에서 발급
 dart:
-  api-key: ${DART_API_KEY:}
+  api-key: c755213756e805825ea9b2a2252b09f0f95b8b3c

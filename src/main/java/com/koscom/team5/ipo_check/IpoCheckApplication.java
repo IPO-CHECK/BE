@@ -1,22 +1,31 @@
 package com.koscom.team5.ipo_check;
 
-import financial.dart.config.DartProperties;
-import financial.dart.vector.properties.OpenAiProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 
-//@EnableScheduling
 @SpringBootApplication
+@EnableConfigurationProperties(financial.dart.config.DartProperties.class)
+@EntityScan(basePackages = {
+		"financial.dart.domain",
+		"financial.dart.vector.domain"
+})
+@EnableJpaRepositories(basePackages = {"financial.dart.repository"})
+@org.springframework.context.annotation.ComponentScan(
+		basePackages = {
+				"com.koscom.team5.ipo_check",
+				"financial.dart"
+		},
+		excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+				type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+				classes = com.koscom.team5.ipo_check.controller.ListedCorpApiController.class
+		)
+)
 public class IpoCheckApplication {
-@EnableConfigurationProperties(DartProperties.class)
-@ConfigurationPropertiesScan(basePackageClasses = {OpenAiProperties.class})
-public class DartApplication {
-
 	public static void main(String[] args) {
-		SpringApplication.run(DartApplication.class, args);
+		SpringApplication.run(IpoCheckApplication.class, args);
 	}
 
 }
