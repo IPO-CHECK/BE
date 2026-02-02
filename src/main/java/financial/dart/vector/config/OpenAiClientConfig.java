@@ -11,8 +11,12 @@ public class OpenAiClientConfig {
 
     @Bean
     public RestClient openAiRestClient(RestClient.Builder builder, OpenAiProperties props) {
+        String baseUrl = props.baseUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            baseUrl = "https://api.openai.com/v1";
+        }
         return builder
-                .baseUrl(props.baseUrl())
+                .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + props.apiKey())
                 .defaultHeader("Content-Type", "application/json")
                 .build();

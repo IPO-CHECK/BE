@@ -7,6 +7,10 @@ spring:
 dart:
   api-key: ${DART_API_KEY}
 
+openai:
+  api-key: ${OPENAI_API_KEY}
+  base-url: https://api.openai.com/v1
+
 ---
 # 로컬 환경
 spring:
@@ -19,7 +23,7 @@ spring:
     password: ${DB_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
