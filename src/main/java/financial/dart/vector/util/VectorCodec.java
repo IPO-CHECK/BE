@@ -26,4 +26,26 @@ public class VectorCodec {
         for (float v : vector) sum += (double)v * v;
         return Math.sqrt(sum);
     }
+
+    /**
+     * 내적(dot product)
+     */
+    public static double dot(float[] a, float[] b) {
+        if (a == null || b == null || a.length != b.length) return 0.0;
+        double sum = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            sum += (double) a[i] * b[i];
+        }
+        return sum;
+    }
+
+    /**
+     * 코사인 유사도 (0~1, 1이 가장 유사)
+     */
+    public static double cosineSimilarity(float[] a, float[] b) {
+        double normA = l2Norm(a);
+        double normB = l2Norm(b);
+        if (normA == 0 || normB == 0) return 0.0;
+        return dot(a, b) / (normA * normB);
+    }
 }
