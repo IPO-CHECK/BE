@@ -83,6 +83,9 @@ public class UpcomingIpoService {
                     entity.updateRceptNo(rceptNo);
                 }
 
+                String industry = fetchIndustryByDetailUrl(row.detailUrl);
+                updateIndustryIfEmpty(entity, industry);
+
                 repository.save(entity);
                 saved.add(entity);
             }
@@ -112,7 +115,6 @@ public class UpcomingIpoService {
 
     public void updateIndustryIfEmpty(UpcomingIpo ipo, String industry) {
         if (ipo == null) return;
-        if (ipo.getIndustry() != null && !ipo.getIndustry().isBlank()) return;
         if (industry == null || industry.isBlank()) return;
         ipo.updateIndustry(industry.trim());
         repository.save(ipo);
@@ -131,6 +133,21 @@ public class UpcomingIpoService {
             }
         }
         return rceptNo == null ? "" : rceptNo.trim();
+    }
+
+    public String fetchIndustryByDetailUrl(String detailUrl) {
+        if (detailUrl == null || detailUrl.isBlank()) return "";
+        Page page = fetchPage(detailUrl);
+        String industry = extractIndustryFromDoc(page.doc());
+        if ((industry == null || industry.isBlank()) && page.bytes() != null) {
+            try {
+                String eucHtml = new String(page.bytes(), Charset.forName("EUC-KR"));
+                industry = extractIndustryFromDoc(Jsoup.parse(eucHtml));
+            } catch (Exception ignored) {
+                // ignore
+            }
+        }
+        return industry == null ? "" : industry.trim();
     }
 
     public String fetchRceptNoByCorpCode(String corpCode) {
@@ -269,6 +286,30 @@ public class UpcomingIpoService {
         Matcher m = p.matcher(html);
         if (m.find()) return m.group(1);
         return "";
+    }
+
+    private String extractIndustryFromDoc(Document doc) {
+        if (doc == null) return "";
+        for (Element tr : doc.select("tr")) {
+            Elements cells = tr.select("th,td");
+            for (int i = 0; i < cells.size(); i++) {
+                String text = normalizeCellText(cells.get(i).text());
+                if (!"업종".equals(text)) continue;
+                for (int j = i + 1; j < cells.size(); j++) {
+                    String value = normalizeCellText(cells.get(j).text());
+                    if (!value.isBlank()) return value;
+                }
+            }
+        }
+        return "";
+    }
+
+    private String normalizeCellText(String text) {
+        if (text == null) return "";
+        return text.replace("\u00A0", " ")
+                .replace("&nbsp;", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String findScheduleText(Elements tds) {
