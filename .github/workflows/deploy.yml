@@ -26,5 +26,5 @@ jobs:
           context: .
           push: true
           tags: |
-            <dockerhub-username>/<image-name>:latest
-            <dockerhub-username>/<image-name>:${{ github.sha }}
+            koscom-team5-was:latest
+            koscom-team5-was:${{ github.sha }}
