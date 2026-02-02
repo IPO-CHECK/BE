@@ -28,6 +28,11 @@ public class FinancialService {
     @Value("${dart.api-key}")
     private String apiKey;
 
+    // 가장 최근 분기 재무제표 조회
+    public Financial findByCorporationId(Long corpId){
+        return financialRepository.findByCorporationId(corpId).orElse(null);
+    }
+
     public Financial findByFinancialId(Long financialId) {
         return financialRepository.findById(financialId).orElse(null);
     }

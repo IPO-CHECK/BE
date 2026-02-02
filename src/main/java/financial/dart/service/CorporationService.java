@@ -34,6 +34,10 @@ public class CorporationService {
         }
     }
 
+    public Long findCorporationIdByCorpCode(String corpCode) {
+        return corporationRepository.findIdByCorpCode(corpCode).orElse(null);
+    }
+
     public List<Corporation> getCorps() {
         return corporationRepository.findCorps();
     }

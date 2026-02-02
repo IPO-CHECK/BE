@@ -29,4 +29,11 @@ public interface FinancialRepository extends JpaRepository<Financial, Long> {
                                         @Param("totalEquity") Long totalEquity,
                                         @Param("year") String year,
                                         @Param("reprtCode") String reprtCode);
+
+    @Query("SELECT f " +
+            "FROM Financial f " +
+            "WHERE f.corporation.id = :corpId " +
+            "ORDER BY f.bsnsYear DESC " +
+            "LIMIT 1")
+    Optional<Financial> findByCorporationId(@Param("corpId") Long corpId);
 }

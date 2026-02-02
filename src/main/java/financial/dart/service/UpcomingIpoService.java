@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,6 +41,10 @@ public class UpcomingIpoService {
         this.repository = repository;
         this.corpCodeXmlParser = corpCodeXmlParser;
         this.resourceLoader = resourceLoader;
+    }
+
+    public String findCorpCodeById(Long id) {
+        return repository.findCorpCodeById(id);
     }
 
     @Transactional
@@ -222,7 +228,9 @@ public class UpcomingIpoService {
         return "";
     }
 
-    private record Row(String corpName, String ipoNo, String detailUrl) {}
+    private record Row(String corpName, String ipoNo, String detailUrl) {
+    }
 
-    private record Page(Document doc, String html, byte[] bytes) {}
+    private record Page(Document doc, String html, byte[] bytes) {
+    }
 }
