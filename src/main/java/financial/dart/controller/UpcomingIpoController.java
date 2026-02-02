@@ -9,7 +9,6 @@ import financial.dart.service.UpcomingIpoSimilarService;
 import financial.dart.vector.dto.UpcomingIpoSimilarResponse;
 import financial.dart.dto.UpcomingDto;
 import financial.dart.service.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,26 +18,31 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/upcoming-ipo")
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, allowedHeaders = "*")
-@RequiredArgsConstructor
 @Slf4j
 public class UpcomingIpoController {
 
     private final UpcomingIpoService upcomingIpoService;
     private final UpcomingIpoSimilarService upcomingIpoSimilarService;
     private final UpcomingIpoRiskAnalysisService riskAnalysisService;
+    private final CorporationService corporationService;
+    private final FinancialService financialService;
+    private final SimilarityService similarityService;
 
     public UpcomingIpoController(
             UpcomingIpoService upcomingIpoService,
             UpcomingIpoSimilarService upcomingIpoSimilarService,
-            UpcomingIpoRiskAnalysisService riskAnalysisService
+            UpcomingIpoRiskAnalysisService riskAnalysisService,
+            CorporationService corporationService,
+            FinancialService financialService,
+            SimilarityService similarityService
     ) {
         this.upcomingIpoService = upcomingIpoService;
         this.upcomingIpoSimilarService = upcomingIpoSimilarService;
         this.riskAnalysisService = riskAnalysisService;
+        this.corporationService = corporationService;
+        this.financialService = financialService;
+        this.similarityService = similarityService;
     }
-    private final CorporationService corporationService;
-    private final FinancialService financialService;
-    private final SimilarityService similarityService;
 
     @PostMapping("/refresh")
     public ResponseEntity<List<UpcomingIpo>> refresh() {
