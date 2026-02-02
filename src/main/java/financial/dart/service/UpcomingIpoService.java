@@ -76,6 +76,7 @@ public class UpcomingIpoService {
         return saved;
     }
 
+    // TODO 상장 예정 기업 리스트업
     public List<UpcomingIpo> listAll() {
         return repository.findAll();
     }

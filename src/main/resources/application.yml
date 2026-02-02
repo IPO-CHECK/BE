@@ -1,6 +1,6 @@
 spring:
   profiles:
-    default: local
+    default: prod
 
 # DART(전자공시) Open API 인증키
 # https://opendart.fss.or.kr 에서 발급
@@ -33,9 +33,9 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: jdbc:mysql://${DB_HOST}:3306/test?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mysql://localhost:3307/test
+    username: kosadmin
+    password: koscomfive789!
   jpa:
     hibernate:
       ddl-auto: update
