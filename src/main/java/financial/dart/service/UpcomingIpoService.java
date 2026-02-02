@@ -52,16 +52,14 @@ public class UpcomingIpoService {
 
         List<UpcomingDto> dtoList = corporationRepository.findAllByCorpCodes(corpCodes);
 
-        List<String> tempCodes = dtoList.stream()
-                .map(UpcomingDto::getCorpCode)
-                .toList();
+        dtoList.sort((o1, o2) -> {
+            String date1 = extractDate(o1.getSubDate());
+            String date2 = extractDate(o2.getSubDate());
+            return date2.compareTo(date1);
+        });
 
-        if (tempCodes.isEmpty()) {
-            return dtoList;
-        }
-
+        // ID 주입
         for (UpcomingDto dto : dtoList) {
-            // (1) UpcomingIpo ID 주입
             if (ipoIdMap.containsKey(dto.getCorpCode())) {
                 dto.setUpcomingIpoId(ipoIdMap.get(dto.getCorpCode()));
             }
@@ -259,5 +257,15 @@ public class UpcomingIpoService {
     }
 
     private record Page(Document doc, String html, byte[] bytes) {
+    }
+
+    private String extractDate(String dateRange) {
+        if (dateRange == null || dateRange.trim().isEmpty() || dateRange.equals("미정")) {
+            // "미정"이거나 비어있으면 가장 과거 날짜로 취급해 맨 아래로 보냄 (내림차순 기준)
+            return "0000.00.00";
+            // 만약 "미정"을 맨 위로 올리고 싶다면 "9999.99.99"로 설정
+        }
+        // "2026.03.11 ~ 2026.03.12" -> "2026.03.11" 추출
+        return dateRange.split("~")[0].trim();
     }
 }
