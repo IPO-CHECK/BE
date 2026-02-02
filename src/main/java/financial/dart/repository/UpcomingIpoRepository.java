@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface UpcomingIpoRepository extends JpaRepository<UpcomingIpo, Long> {
     Optional<UpcomingIpo> findByIpoNo(String ipoNo);
@@ -16,4 +17,5 @@ public interface UpcomingIpoRepository extends JpaRepository<UpcomingIpo, Long> 
 
     @Query("SELECT u FROM UpcomingIpo u")
     List<UpcomingIpo> findAllCorpCodes();
+    int deleteByIpoNoNotIn(Set<String> ipoNos);
 }

@@ -3,6 +3,7 @@ package financial.dart.service;
 import financial.dart.ListedCorp.CorpCodeRow;
 import financial.dart.ListedCorp.NameNormalizer;
 import financial.dart.domain.ListedCorp;
+import financial.dart.client.DartClient;
 import financial.dart.domain.UpcomingIpo;
 import financial.dart.dto.UpcomingDto;
 import financial.dart.repository.CorporationRepository;
@@ -23,6 +24,9 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -39,6 +43,7 @@ public class UpcomingIpoService {
     private final UpcomingIpoRepository repository;
     private final CorpCodeXmlParser corpCodeXmlParser;
     private final ResourceLoader resourceLoader;
+    private final DartClient dartClient;
 
     private Map<String, List<CorpCodeRow>> corpNameMap;
 
@@ -76,6 +81,8 @@ public class UpcomingIpoService {
     public List<UpcomingIpo> refreshFrom38() {
         Map<String, List<CorpCodeRow>> nameMap = getCorpNameMap();
         List<UpcomingIpo> saved = new ArrayList<>();
+        Map<String, String> rceptCache = new HashMap<>();
+        Set<String> seenIpoNos = new HashSet<>();
 
         int maxPage = detectMaxPage();
         for (int page = 1; page <= maxPage; page++) {
@@ -84,6 +91,7 @@ public class UpcomingIpoService {
             List<Row> rows = parseUpcomingRows(doc);
 
             for (Row row : rows) {
+                seenIpoNos.add(row.ipoNo);
                 String normalized = NameNormalizer.norm(row.corpName);
                 String corpCode = pickCorpCode(nameMap, normalized);
 
@@ -94,7 +102,13 @@ public class UpcomingIpoService {
 
                 entity.updateBasic(row.corpName, normalized, corpCode, row.detailUrl);
 
-                String rceptNo = fetchRceptNoByDetailUrl(row.detailUrl);
+                String rceptNo = "";
+                if (corpCode != null && !corpCode.isBlank()) {
+                    rceptNo = rceptCache.computeIfAbsent(corpCode, this::fetchRceptNoByCorpCode);
+                }
+                if (rceptNo == null || rceptNo.isBlank()) {
+                    rceptNo = fetchRceptNoByDetailUrl(row.detailUrl);
+                }
                 if (rceptNo != null && !rceptNo.isBlank()) {
                     entity.updateRceptNo(rceptNo);
                 }
@@ -102,6 +116,12 @@ public class UpcomingIpoService {
                 repository.save(entity);
                 saved.add(entity);
             }
+        }
+
+        if (!seenIpoNos.isEmpty()) {
+            repository.deleteByIpoNoNotIn(seenIpoNos);
+        } else {
+            // 목록을 찾지 못한 경우 삭제하지 않음
         }
 
         return saved;
@@ -142,6 +162,33 @@ public class UpcomingIpoService {
             }
         }
         return rceptNo == null ? "" : rceptNo.trim();
+    }
+
+    public String fetchRceptNoByCorpCode(String corpCode) {
+        if (corpCode == null || corpCode.isBlank()) return "";
+        try {
+            Map<?, ?> response = dartClient.fetchEstkRs(corpCode, "19900101", "20991231");
+            if (response == null) return "";
+            Object statusObj = response.get("status");
+            if (statusObj != null && !"000".equals(String.valueOf(statusObj))) return "";
+            Object groupsObj = response.get("group");
+            if (!(groupsObj instanceof List<?> groups)) return "";
+            for (Object groupObj : groups) {
+                if (!(groupObj instanceof Map<?, ?> group)) continue;
+                Object listObj = group.get("list");
+                if (!(listObj instanceof List<?> list) || list.isEmpty()) continue;
+                for (Object itemObj : list) {
+                    if (!(itemObj instanceof Map<?, ?> item)) continue;
+                    Object rceptNo = item.get("rcept_no");
+                    if (rceptNo != null && !String.valueOf(rceptNo).isBlank()) {
+                        return String.valueOf(rceptNo).trim();
+                    }
+                }
+            }
+            return "";
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private Map<String, List<CorpCodeRow>> getCorpNameMap() {
@@ -218,8 +265,9 @@ public class UpcomingIpoService {
                 if (tds.size() < 3) continue;
 
                 String corpName = tds.get(0).text().trim();
-                String fixedPrice = tds.get(2).text().trim();
-                if (corpName.isEmpty() || !"-".equals(fixedPrice)) continue;
+                String scheduleText = findScheduleText(tds);
+                LocalDate endDate = parseEndDate(scheduleText);
+                if (corpName.isEmpty() || endDate == null || !endDate.isAfter(today)) continue;
 
                 Element link = tds.get(0).selectFirst("a[href*='no=']");
                 if (link == null) continue;
@@ -253,8 +301,43 @@ public class UpcomingIpoService {
         return "";
     }
 
-    private record Row(String corpName, String ipoNo, String detailUrl) {
+    private String findScheduleText(Elements tds) {
+        for (Element td : tds) {
+            String text = td.text().trim();
+            if (text.matches(".*\\d{4}\\.\\d{2}\\.\\d{2}.*")) {
+                return text;
+            }
+        }
+        return "";
     }
+
+    private LocalDate parseEndDate(String text) {
+        if (text == null || text.isBlank()) return null;
+        Matcher full = Pattern.compile("(\\d{4})\\.(\\d{2})\\.(\\d{2})").matcher(text);
+        List<LocalDate> dates = new ArrayList<>();
+        while (full.find()) {
+            int y = Integer.parseInt(full.group(1));
+            int m = Integer.parseInt(full.group(2));
+            int d = Integer.parseInt(full.group(3));
+            dates.add(LocalDate.of(y, m, d));
+        }
+        if (!dates.isEmpty()) {
+            if (dates.size() >= 2) {
+                return dates.get(dates.size() - 1);
+            }
+            LocalDate start = dates.get(0);
+            Matcher shortEnd = Pattern.compile("~\\s*(\\d{2})\\.(\\d{2})").matcher(text);
+            if (shortEnd.find()) {
+                int m = Integer.parseInt(shortEnd.group(1));
+                int d = Integer.parseInt(shortEnd.group(2));
+                return LocalDate.of(start.getYear(), m, d);
+            }
+            return start;
+        }
+        return null;
+    }
+
+    private record Row(String corpName, String ipoNo, String detailUrl) {}
 
     private record Page(Document doc, String html, byte[] bytes) {
     }

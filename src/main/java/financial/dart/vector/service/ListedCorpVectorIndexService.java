@@ -10,6 +10,8 @@ import financial.dart.vector.domain.ListedCorpVector;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ListedCorpVectorIndexService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -123,24 +126,27 @@ public class ListedCorpVectorIndexService {
     public void indexAll() {
         List<ListedCorp> corps = listedCorpRepository.findAll();
 
-        int cnt=0;
+        int cnt = 0;
+        int total = corps.size();
+        log.info("상장기업 전체 인덱싱 시작: total={}", total);
 
         for (ListedCorp corp : corps) {
-
-            if(cnt==300){
-                return;
-            }
 
             String key = corp.getCorpCode() != null
                     ? corp.getCorpCode()
                     : corp.getStockCode();
 
             if (key == null || key.isBlank()) {
+                log.info("인덱싱 스킵(키 없음): id={}, name={}", corp.getId(), corp.getCorpName());
                 continue;
             }
 
             indexOneByCorpCodeOrStockCode(key);
             cnt++;
+            log.info("인덱싱 진행: {}/{} (key={})", cnt, total, key);
         }
+
+        log.info("상장기업 전체 인덱싱 완료: indexed={}/{}", cnt, total);
     }
+
 }
