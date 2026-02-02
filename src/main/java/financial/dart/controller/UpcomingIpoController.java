@@ -33,6 +33,7 @@ public class UpcomingIpoController {
     public ResponseEntity<List<UpcomingIpo>> list() {
         return ResponseEntity.ok(upcomingIpoService.listAll());
     }
+
     // 메인 화면에서 신규 상장 종목 리스트 조회
     @GetMapping("/list")
     public ResponseEntity<List<UpcomingDto>> mainPageList() {
@@ -49,6 +50,7 @@ public class UpcomingIpoController {
 //        return ResponseEntity.ok(upcomingIpoSimilarService.findSimilar(id));
 //    }
 
+    // 상세 정보 조회
     @GetMapping("/{id}/details")
     public ResponseEntity<Void> test(@PathVariable Long id) {
         String corpCode = upcomingIpoService.findCorpCodeById(id);
@@ -103,6 +105,8 @@ public class UpcomingIpoController {
                     rawStr,
                     zStr);
         }
+
+        // TODO 전체 데이터 프론트로 반환
 
         return ResponseEntity.ok().build();
     }
