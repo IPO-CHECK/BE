@@ -5,7 +5,7 @@ spring:
 # DART(전자공시) Open API 인증키
 # https://opendart.fss.or.kr 에서 발급
 dart:
-  api-key: ${DART_API_KEY:}
+  api-key: ${DART_API_KEY}
 
 ---
 # 로컬 환경
