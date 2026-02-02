@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface ListedCorpRepository extends JpaRepository<ListedCorp, Long> {
     Optional<ListedCorp> findByCorpCode(String corpCode);
+    Optional<ListedCorp> findByStockCode(String stockCode);
 }
