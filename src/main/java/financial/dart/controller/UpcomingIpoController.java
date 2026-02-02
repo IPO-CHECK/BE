@@ -2,8 +2,8 @@ package financial.dart.controller;
 
 import financial.dart.domain.Financial;
 import financial.dart.domain.UpcomingIpo;
+import financial.dart.dto.UpcomingDto;
 import financial.dart.service.*;
-import financial.dart.vector.dto.UpcomingIpoSimilarResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +34,12 @@ public class UpcomingIpoController {
         return ResponseEntity.ok(upcomingIpoService.listAll());
     }
 
+    // 메인 화면에서 신규 상장 종목 리스트 조회
+    @GetMapping("/list")
+    public ResponseEntity<List<UpcomingDto>> mainPageList() {
+        return ResponseEntity.ok(upcomingIpoService.mainPageList());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<UpcomingIpo> get(@PathVariable Long id) {
         return ResponseEntity.ok(upcomingIpoService.getById(id));
@@ -44,25 +50,28 @@ public class UpcomingIpoController {
 //        return ResponseEntity.ok(upcomingIpoSimilarService.findSimilar(id));
 //    }
 
-    @GetMapping("/{id}/test")
+    // 상세 정보 조회
+    @GetMapping("/{id}/details")
     public ResponseEntity<Void> test(@PathVariable Long id) {
+        String corpCode = upcomingIpoService.findCorpCodeById(id);
+        log.info("🔍 신규 상장 종목 Corp Code: {}", corpCode);
 
-        // TODO id는 신규 상장 종목의 UpcomingIpo PK
+        Long corpId = corporationService.findCorporationIdByCorpCode(corpCode);
+        log.info("🔍 신규 상장 종목 Corporation ID: {}", corpId);
 
-        // TODO 신규 상장 종목의 재무제표를 가져와야 함.
-        Financial targetFinancial = financialService.findByFinancialId(5L);
-        log.info("신규 상장 종목: {}, 매출액={}, 자산총계={}, 자본총계={}",
+        // 신규 상장 종목의 재무제표 조회
+        Financial targetFinancial = financialService.findByCorporationId(corpId);
+        log.info("🎯 타겟 종목: {}, 매출액={}, 자산총계={}, 자본총계={}",
                 targetFinancial.getCorporation().getCorpName(),
                 targetFinancial.getRevenue(),
                 targetFinancial.getTotalAssets(),
                 targetFinancial.getTotalEquity());
-
         // 0. 분류 및 품목 필터링
         List<Long> corpIds = upcomingIpoSimilarService.findSimilar(id);
 //        List<Long> corpIds = corporationService.findQualifiedCorpIds();
 
-        // 1. 신규 상장 종목의 상장 날짜가 Y년도 M분기인지 필요, 파라미터로 넘겨서 쿼리 where절에 추가
-        List<Financial> financials = financialService.findSimilarCorporations(corpIds, targetFinancial, "2024", 1);
+        // 1. 규모 0.2배 ~ 5배 이내 후보군 추출
+        List<Financial> financials = financialService.findSimilarCorporations(corpIds, targetFinancial, "2025", 3);
 
         for (Financial f : financials) {
             log.info("후보 종목: {}, 매출액={}, 자산총계={}, 자본총계={}",
@@ -96,6 +105,8 @@ public class UpcomingIpoController {
                     rawStr,
                     zStr);
         }
+
+        // TODO 전체 데이터 프론트로 반환
 
         return ResponseEntity.ok().build();
     }

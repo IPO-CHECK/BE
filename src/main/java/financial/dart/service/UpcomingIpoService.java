@@ -2,10 +2,15 @@ package financial.dart.service;
 
 import financial.dart.ListedCorp.CorpCodeRow;
 import financial.dart.ListedCorp.NameNormalizer;
+import financial.dart.domain.ListedCorp;
 import financial.dart.client.DartClient;
 import financial.dart.domain.UpcomingIpo;
+import financial.dart.dto.UpcomingDto;
+import financial.dart.repository.CorporationRepository;
+import financial.dart.repository.ListedCorpRepository;
 import financial.dart.repository.UpcomingIpoRepository;
 import financial.dart.util.CorpCodeXmlParser;
+import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -16,18 +21,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UpcomingIpoService {
 
     private static final String LIST_URL = "https://www.38.co.kr/html/fund/index.htm?o=k";
     private static final String DETAIL_URL_PREFIX = "https://www.38.co.kr/html/fund/?o=v&no=";
 
+    private final ListedCorpRepository listedCorpRepository;
+    private final CorporationRepository corporationRepository;
     private final UpcomingIpoRepository repository;
     private final CorpCodeXmlParser corpCodeXmlParser;
     private final ResourceLoader resourceLoader;
@@ -35,16 +47,34 @@ public class UpcomingIpoService {
 
     private Map<String, List<CorpCodeRow>> corpNameMap;
 
-    public UpcomingIpoService(
-            UpcomingIpoRepository repository,
-            CorpCodeXmlParser corpCodeXmlParser,
-            ResourceLoader resourceLoader,
-            DartClient dartClient
-    ) {
-        this.repository = repository;
-        this.corpCodeXmlParser = corpCodeXmlParser;
-        this.resourceLoader = resourceLoader;
-        this.dartClient = dartClient;
+    public List<UpcomingDto> mainPageList() {
+        List<UpcomingIpo> upcomingIpos = repository.findAll();
+
+        Map<String, Long> ipoIdMap = upcomingIpos.stream()
+                .collect(Collectors.toMap(UpcomingIpo::getCorpCode, UpcomingIpo::getId));
+
+        List<String> corpCodes = new ArrayList<>(ipoIdMap.keySet());
+
+        List<UpcomingDto> dtoList = corporationRepository.findAllByCorpCodes(corpCodes);
+
+        dtoList.sort((o1, o2) -> {
+            String date1 = extractDate(o1.getSubDate());
+            String date2 = extractDate(o2.getSubDate());
+            return date2.compareTo(date1);
+        });
+
+        // ID 주입
+        for (UpcomingDto dto : dtoList) {
+            if (ipoIdMap.containsKey(dto.getCorpCode())) {
+                dto.setUpcomingIpoId(ipoIdMap.get(dto.getCorpCode()));
+            }
+        }
+
+        return dtoList;
+    }
+
+    public String findCorpCodeById(Long id) {
+        return repository.findCorpCodeById(id);
     }
 
     @Transactional
@@ -310,5 +340,16 @@ public class UpcomingIpoService {
 
     private record Row(String corpName, String ipoNo, String detailUrl) {}
 
-    private record Page(Document doc, String html, byte[] bytes) {}
+    private record Page(Document doc, String html, byte[] bytes) {
+    }
+
+    private String extractDate(String dateRange) {
+        if (dateRange == null || dateRange.trim().isEmpty() || dateRange.equals("미정")) {
+            // "미정"이거나 비어있으면 가장 과거 날짜로 취급해 맨 아래로 보냄 (내림차순 기준)
+            return "0000.00.00";
+            // 만약 "미정"을 맨 위로 올리고 싶다면 "9999.99.99"로 설정
+        }
+        // "2026.03.11 ~ 2026.03.12" -> "2026.03.11" 추출
+        return dateRange.split("~")[0].trim();
+    }
 }
