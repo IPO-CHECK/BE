@@ -29,4 +29,10 @@ public class CorpSectionMainXmlService {
 
         return extractor.extractFromMainXml(mainXml);
     }
+
+    public String fetchKeyInvestmentRiskByRcpNo(String rcpNo) {
+        byte[] zip = dartClient.downloadDocumentZip(rcpNo);
+        String mainXml = zipMainXmlExtractor.extractMainXmlText(zip, rcpNo);
+        return extractor.extractKeyInvestmentRisk(mainXml);
+    }
 }

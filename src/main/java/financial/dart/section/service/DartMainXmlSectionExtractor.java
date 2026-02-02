@@ -26,9 +26,21 @@ public class DartMainXmlSectionExtractor {
                     "</TITLE>"
     );
 
+    // <TITLE ...>1. 핵심투자위험</TITLE>
+    private static final Pattern TITLE_KEY_RISK = Pattern.compile(
+            "(?s)<TITLE\\b[^>]*>\\s*" +
+                    "1\\s*\\.\\s*" +
+                    "핵심\\s*투자\\s*위험\\s*" +
+                    "</TITLE>"
+    );
+
     // 다음 섹션 시작(보통 3. 으로 시작). 없으면 문서 끝까지.
     private static final Pattern TITLE_NEXT_AFTER_PROD = Pattern.compile(
             "(?s)<TITLE\\b[^>]*>\\s*(?:3\\s*\\.|Ⅲ\\s*\\.|III\\s*\\.)"
+    );
+
+    private static final Pattern TITLE_ANY = Pattern.compile(
+            "(?s)<TITLE\\b"
     );
 
     public SectionPair extractFromMainXml(String rawXml) {
@@ -43,6 +55,13 @@ public class DartMainXmlSectionExtractor {
         if (prodRaw.isBlank()) prodText = "";
 
         return new SectionPair(bizText, prodText);
+    }
+
+    public String extractKeyInvestmentRisk(String rawXml) {
+        String riskRaw = sliceAfterTitle(rawXml, TITLE_KEY_RISK, TITLE_ANY);
+        String riskText = "1. 핵심투자위험\n" + toPlainText(riskRaw).trim();
+        if (riskRaw.isBlank()) riskText = "";
+        return riskText;
     }
 
     /** startTitle 끝 ~ endTitle 시작 전까지 자르기 */

@@ -2,9 +2,13 @@ package financial.dart.controller;
 
 import financial.dart.domain.Financial;
 import financial.dart.domain.UpcomingIpo;
+import financial.dart.domain.UpcomingIpoRiskAnalysis;
+import financial.dart.service.UpcomingIpoService;
+import financial.dart.service.UpcomingIpoRiskAnalysisService;
+import financial.dart.service.UpcomingIpoSimilarService;
+import financial.dart.vector.dto.UpcomingIpoSimilarResponse;
 import financial.dart.dto.UpcomingDto;
 import financial.dart.service.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,15 +18,31 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/upcoming-ipo")
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, allowedHeaders = "*")
-@RequiredArgsConstructor
 @Slf4j
 public class UpcomingIpoController {
 
     private final UpcomingIpoService upcomingIpoService;
     private final UpcomingIpoSimilarService upcomingIpoSimilarService;
+    private final UpcomingIpoRiskAnalysisService riskAnalysisService;
     private final CorporationService corporationService;
     private final FinancialService financialService;
     private final SimilarityService similarityService;
+
+    public UpcomingIpoController(
+            UpcomingIpoService upcomingIpoService,
+            UpcomingIpoSimilarService upcomingIpoSimilarService,
+            UpcomingIpoRiskAnalysisService riskAnalysisService,
+            CorporationService corporationService,
+            FinancialService financialService,
+            SimilarityService similarityService
+    ) {
+        this.upcomingIpoService = upcomingIpoService;
+        this.upcomingIpoSimilarService = upcomingIpoSimilarService;
+        this.riskAnalysisService = riskAnalysisService;
+        this.corporationService = corporationService;
+        this.financialService = financialService;
+        this.similarityService = similarityService;
+    }
 
     @PostMapping("/refresh")
     public ResponseEntity<List<UpcomingIpo>> refresh() {
@@ -120,4 +140,24 @@ public class UpcomingIpoController {
         sb.append("]");
         return sb.toString();
     }
+
+    @GetMapping("/{id}/risk-analysis")
+    public ResponseEntity<RiskAnalysisResponse> riskAnalysis(@PathVariable Long id) {
+        UpcomingIpoRiskAnalysis analysis = riskAnalysisService.getOrCreate(id);
+        return ResponseEntity.ok(new RiskAnalysisResponse(
+                analysis.getUpcomingIpo().getId(),
+                analysis.getRceptNo(),
+                analysis.getKeyRiskText(),
+                analysis.getAnalysisText(),
+                analysis.getUpdatedAt().toString()
+        ));
+    }
+
+    public record RiskAnalysisResponse(
+            Long upcomingIpoId,
+            String rceptNo,
+            String keyRiskText,
+            String analysisText,
+            String updatedAt
+    ) {}
 }
