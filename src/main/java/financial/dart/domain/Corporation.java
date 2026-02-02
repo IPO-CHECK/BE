@@ -22,6 +22,8 @@ public class Corporation {
     private String corpName;
     private String stockCode;
     private String modifyDate;
+    private String market;
+    private String industry;
 
     @Column(length = 1000)
     private String majorProducts;      // 주요 제품

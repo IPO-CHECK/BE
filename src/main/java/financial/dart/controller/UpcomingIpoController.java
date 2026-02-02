@@ -2,6 +2,7 @@ package financial.dart.controller;
 
 import financial.dart.domain.Financial;
 import financial.dart.domain.UpcomingIpo;
+import financial.dart.dto.UpcomingDto;
 import financial.dart.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +29,14 @@ public class UpcomingIpoController {
         return ResponseEntity.ok(upcomingIpoService.refreshFrom38());
     }
 
-    // 메인 화면에서 신규 상장 종목 리스트 조회
     @GetMapping
     public ResponseEntity<List<UpcomingIpo>> list() {
         return ResponseEntity.ok(upcomingIpoService.listAll());
+    }
+    // 메인 화면에서 신규 상장 종목 리스트 조회
+    @GetMapping("/list")
+    public ResponseEntity<List<UpcomingDto>> mainPageList() {
+        return ResponseEntity.ok(upcomingIpoService.mainPageList());
     }
 
     @GetMapping("/{id}")
@@ -44,11 +49,10 @@ public class UpcomingIpoController {
 //        return ResponseEntity.ok(upcomingIpoSimilarService.findSimilar(id));
 //    }
 
-    @GetMapping("/{id}/test")
+    @GetMapping("/{id}/details")
     public ResponseEntity<Void> test(@PathVariable Long id) {
-        // id는 신규 상장 종목의 UpcomingIpo PK
         String corpCode = upcomingIpoService.findCorpCodeById(id);
-        log.info("🔍 신규 상장 종목 CorpCode: {}", corpCode);
+        log.info("🔍 신규 상장 종목 Corp Code: {}", corpCode);
 
         Long corpId = corporationService.findCorporationIdByCorpCode(corpCode);
         log.info("🔍 신규 상장 종목 Corporation ID: {}", corpId);

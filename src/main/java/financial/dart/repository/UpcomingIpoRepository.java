@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UpcomingIpoRepository extends JpaRepository<UpcomingIpo, Long> {
@@ -12,4 +13,7 @@ public interface UpcomingIpoRepository extends JpaRepository<UpcomingIpo, Long> 
 
     @Query("SELECT u.corpCode FROM UpcomingIpo u WHERE u.id = :id")
     String findCorpCodeById(@Param("id") Long id);
+
+    @Query("SELECT u FROM UpcomingIpo u")
+    List<UpcomingIpo> findAllCorpCodes();
 }

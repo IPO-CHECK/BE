@@ -2,9 +2,14 @@ package financial.dart.service;
 
 import financial.dart.ListedCorp.CorpCodeRow;
 import financial.dart.ListedCorp.NameNormalizer;
+import financial.dart.domain.ListedCorp;
 import financial.dart.domain.UpcomingIpo;
+import financial.dart.dto.UpcomingDto;
+import financial.dart.repository.CorporationRepository;
+import financial.dart.repository.ListedCorpRepository;
 import financial.dart.repository.UpcomingIpoRepository;
 import financial.dart.util.CorpCodeXmlParser;
+import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -20,27 +25,49 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UpcomingIpoService {
 
     private static final String LIST_URL = "https://www.38.co.kr/html/fund/index.htm?o=k";
     private static final String DETAIL_URL_PREFIX = "https://www.38.co.kr/html/fund/?o=v&no=";
 
+    private final ListedCorpRepository listedCorpRepository;
+    private final CorporationRepository corporationRepository;
     private final UpcomingIpoRepository repository;
     private final CorpCodeXmlParser corpCodeXmlParser;
     private final ResourceLoader resourceLoader;
 
     private Map<String, List<CorpCodeRow>> corpNameMap;
 
-    public UpcomingIpoService(
-            UpcomingIpoRepository repository,
-            CorpCodeXmlParser corpCodeXmlParser,
-            ResourceLoader resourceLoader
-    ) {
-        this.repository = repository;
-        this.corpCodeXmlParser = corpCodeXmlParser;
-        this.resourceLoader = resourceLoader;
+    public List<UpcomingDto> mainPageList() {
+        List<UpcomingIpo> upcomingIpos = repository.findAll();
+
+        Map<String, Long> ipoIdMap = upcomingIpos.stream()
+                .collect(Collectors.toMap(UpcomingIpo::getCorpCode, UpcomingIpo::getId));
+
+        List<String> corpCodes = new ArrayList<>(ipoIdMap.keySet());
+
+        List<UpcomingDto> dtoList = corporationRepository.findAllByCorpCodes(corpCodes);
+
+        List<String> tempCodes = dtoList.stream()
+                .map(UpcomingDto::getCorpCode)
+                .toList();
+
+        if (tempCodes.isEmpty()) {
+            return dtoList;
+        }
+
+        for (UpcomingDto dto : dtoList) {
+            // (1) UpcomingIpo ID 주입
+            if (ipoIdMap.containsKey(dto.getCorpCode())) {
+                dto.setUpcomingIpoId(ipoIdMap.get(dto.getCorpCode()));
+            }
+        }
+
+        return dtoList;
     }
 
     public String findCorpCodeById(Long id) {
