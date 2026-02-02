@@ -250,6 +250,7 @@ public class UpcomingIpoService {
     private List<Row> parseUpcomingRows(Document doc) {
         List<Row> rows = new ArrayList<>();
         Elements tables = doc.select("table");
+        LocalDate today = LocalDate.now();
 
         for (Element table : tables) {
             Elements header = table.select("tr").first() == null
