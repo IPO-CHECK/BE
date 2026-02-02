@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 public class CorpVectorIndexService {
 
     public IndexResultDto indexLatest(String corpCode) {
-        // TODO: 최신 rcpNo 조회 + 섹션 추출 + 청킹 + 임베딩 + qdrant upsert
+        // TODO: 최신 rcpNo 조회 + 섹션 추출 + 청킹 + 임베딩
         String rcpNo = "TODO";
         int chunkCount = 0;
         int upsertedCount = 0;
