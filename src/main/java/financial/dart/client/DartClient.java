@@ -4,6 +4,8 @@ import financial.dart.config.DartProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Map;
+
 @Component
 public class DartClient {
 
@@ -25,5 +27,19 @@ public class DartClient {
                         .build())
                 .retrieve()
                 .body(byte[].class);
+    }
+
+    // ✅ 증권신고서 정보(estkRs) 조회
+    public Map<?, ?> fetchEstkRs(String corpCode, String bgnDe, String endDe) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/estkRs.json")
+                        .queryParam("crtfc_key", props.apiKey())
+                        .queryParam("corp_code", corpCode)
+                        .queryParam("bgn_de", bgnDe)
+                        .queryParam("end_de", endDe)
+                        .build())
+                .retrieve()
+                .body(Map.class);
     }
 }
