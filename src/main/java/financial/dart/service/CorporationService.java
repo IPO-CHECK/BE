@@ -1,6 +1,8 @@
 package financial.dart.service;
 
 import financial.dart.domain.Corporation;
+import financial.dart.dto.BasicDto;
+import financial.dart.dto.DetailDto;
 import financial.dart.repository.CorporationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +13,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,24 @@ public class CorporationService {
 
     private final CorporationRepository corporationRepository;
     private final RestTemplate restTemplate;
+
+    public BasicDto getBasicDetail(String corpCode) {
+        Corporation corp = corporationRepository.findByCorpCode(corpCode);
+        return BasicDto.builder()
+                .id(corp.getId())
+                .name(corp.getCorpName())
+                .code(corp.getCorpCode())
+                .industry(corp.getIndustry())
+                .market(corp.getMarket())
+                .products(corp.getMajorProducts())
+                .expectedPrice(corp.getHopePriceBand())
+                .finalPrice(corp.getFinalOfferPrice())
+                .publicShares(String.format("%,d주", corp.getTotalOfferShares()))
+                .generalShares(formatSharesRange(corp.getGeneralOfferShares()))
+                .underwriter(corp.getUnderwriter())
+                .schedule(buildSchedule(corp)) // 일정 리스트 빌드
+                .build();
+    }
 
     @Transactional
     public void saveCorporationData(List<Corporation> corporations) {
@@ -171,5 +194,80 @@ public class CorporationService {
             }
         }
         corporation.updateHasNoMajorChanges(true);
+    }
+
+    private List<BasicDto.ScheduleDto> buildSchedule(Corporation corp) {
+        List<BasicDto.ScheduleDto> schedules = new ArrayList<>();
+        LocalDate today = LocalDate.now(); // 오늘 날짜: 2026-02-03
+
+        // 1. 모든 단계를 리스트에 추가 (기본 addStep 로직 수행)
+        addStep(schedules, "예비심사청구", corp.getPreliminaryReviewDate(), today);
+        addStep(schedules, "심사승인", corp.getApprovalDate(), today);
+        addStep(schedules, "청약공고", corp.getSubscriptionNoticeDate(), today);
+        addStep(schedules, "청약기일", corp.getSubscriptionDate(), today);
+        addStep(schedules, "납입기일", corp.getPaymentDate(), today);
+        addStep(schedules, "배정공고", corp.getAllocationDate(), today);
+        addStep(schedules, "상장일", corp.getListingDate(), today);
+
+        // 2. 리스트에 "active" 상태인 일정이 있는지 확인
+        boolean hasActive = schedules.stream()
+                .anyMatch(s -> "active".equals(s.getStatus()));
+
+        // 3. 오늘 날짜와 딱 맞는 일정이 없어 active가 비어있다면,
+        //    future 중 가장 빠른 것(리스트 상의 첫 번째 future)을 active로 변경
+        if (!hasActive) {
+            for (BasicDto.ScheduleDto schedule : schedules) {
+                if ("future".equals(schedule.getStatus())) {
+                    schedule.setStatus("active");
+                    break; // 가장 빠른 하나만 찾으면 루프 종료
+                }
+            }
+        }
+
+        return schedules;
+    }
+
+    private void addStep(List<BasicDto.ScheduleDto> list, String step, String dateStr, LocalDate today) {
+        if (dateStr == null || dateStr.isEmpty()) return;
+
+        String status = "future";
+        try {
+            // "2026.03.11" 또는 "2026.03.11 ~ 2026.03.12" 형식 처리
+            String compareDate = dateStr.contains("~") ? dateStr.split("~")[0].trim() : dateStr;
+            LocalDate targetDate = LocalDate.parse(compareDate.replace(".", "-"));
+
+            if (targetDate.isBefore(today)) status = "done";
+            else if (targetDate.isEqual(today)) status = "active";
+        } catch (Exception e) {
+            // "미정" 등의 문자열 처리
+            status = "future";
+        }
+
+        list.add(new BasicDto.ScheduleDto(step, dateStr, status));
+    }
+
+    // 범위 문자열을 위한 포맷팅 메서드
+    private String formatSharesRange(String shares) {
+        if (shares == null || shares.isEmpty() || shares.equals("미정")) {
+            return shares;
+        }
+
+        // 1. 기존에 혹시 있을지 모를 콤마(,)를 제거하고 숫자를 찾습니다.
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\d+");
+        java.util.regex.Matcher matcher = pattern.matcher(shares.replace(",", ""));
+        StringBuilder sb = new StringBuilder();
+
+        while (matcher.find()) {
+            try {
+                // 2. 찾은 숫자를 파싱하여 3자리 콤마 + '주' 포맷으로 변경
+                long value = Long.parseLong(matcher.group());
+                matcher.appendReplacement(sb, String.format("%,d주", value));
+            } catch (NumberFormatException e) {
+                // 파싱 실패 시 해당 부분은 원본 유지 (안전 장치)
+            }
+        }
+        matcher.appendTail(sb);
+
+        return sb.toString();
     }
 }

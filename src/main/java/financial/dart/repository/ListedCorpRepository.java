@@ -15,4 +15,7 @@ public interface ListedCorpRepository extends JpaRepository<ListedCorp, Long> {
 
     @Query("SELECT lc FROM FinancialListedCorp lc WHERE lc.corpCode IN :corpCodes")
     List<ListedCorp> findByCorpCodeIn(@Param("corpCodes") List<String> corpCodes);
+
+    @Query("SELECT lc.corpCode FROM FinancialListedCorp lc WHERE lc.id IN :ids")
+    List<String> findCorpCodesByIdIn(List<Long> ids);
 }

@@ -36,4 +36,10 @@ public interface FinancialRepository extends JpaRepository<Financial, Long> {
             "ORDER BY f.bsnsYear DESC " +
             "LIMIT 1")
     Optional<Financial> findByCorporationId(@Param("corpId") Long corpId);
+
+    @Query("SELECT f " +
+            "FROM Financial f " +
+            "WHERE f.corporation.id = :corpId " +
+            "ORDER BY f.bsnsYear ASC")
+    List<Financial> findByCorporationIdOrderByBsnsYearAsc(@Param("corpId") Long corpId);
 }
