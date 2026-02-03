@@ -116,6 +116,18 @@ public class UpcomingIpoService {
                 String industry = fetchIndustryByDetailUrl(row.detailUrl);
                 updateIndustryIfEmpty(entity, industry);
 
+                DetailInfo detailInfo = fetchDetailInfoByDetailUrl(row.detailUrl);
+                if (detailInfo != null) {
+                    entity.updateOfferingInfo(
+                            detailInfo.underwriter(),
+                            detailInfo.subDate(),
+                            detailInfo.listDate(),
+                            detailInfo.status(),
+                            detailInfo.price(),
+                            detailInfo.expectedPrice()
+                    );
+                }
+
                 repository.save(entity);
                 saved.add(entity);
             }
@@ -179,6 +191,21 @@ public class UpcomingIpoService {
             }
         }
         return industry == null ? "" : industry.trim();
+    }
+
+    public DetailInfo fetchDetailInfoByDetailUrl(String detailUrl) {
+        if (detailUrl == null || detailUrl.isBlank()) return null;
+        Page page = fetchPage(detailUrl);
+        DetailInfo info = extractDetailInfoFromDoc(page.doc());
+        if ((info == null || info.isBlank()) && page.bytes() != null) {
+            try {
+                String eucHtml = new String(page.bytes(), Charset.forName("EUC-KR"));
+                info = extractDetailInfoFromDoc(Jsoup.parse(eucHtml));
+            } catch (Exception ignored) {
+                // ignore
+            }
+        }
+        return info;
     }
 
     public String fetchRceptNoByCorpCode(String corpCode) {
@@ -335,12 +362,88 @@ public class UpcomingIpoService {
         return "";
     }
 
+    private DetailInfo extractDetailInfoFromDoc(Document doc) {
+        if (doc == null) return DetailInfo.empty();
+        String underwriter = extractValueByLabels(doc, List.of("주관사", "주간사", "인수회사", "인수인"));
+        String subDate = extractValueByLabels(doc, List.of("공모청약일"));
+        String listDate = extractValueByLabels(doc, List.of("상장일"));
+        String status = extractValueByLabels(doc, List.of("진행상황"));
+        String price = extractValueByLabels(doc, List.of("공모가", "확정공모가"));
+        String expectedPrice = extractValueByLabels(doc, List.of("희망공모가액"));
+
+        if (listDate == null || listDate.isBlank()) {
+            listDate = "미정";
+        }
+        if (status == null || status.isBlank()) {
+            status = deriveStatus(subDate, listDate);
+        }
+        return new DetailInfo(
+                blankToNull(underwriter),
+                blankToNull(subDate),
+                blankToNull(listDate),
+                blankToNull(status),
+                blankToNull(price),
+                blankToNull(expectedPrice)
+        );
+    }
+
+    private String extractValueByLabels(Document doc, List<String> labels) {
+        for (Element tr : doc.select("tr")) {
+            Elements cells = tr.select("th,td");
+            for (int i = 0; i < cells.size(); i++) {
+                String text = normalizeCellText(cells.get(i).text());
+                if (text.isEmpty()) continue;
+                if (!labels.contains(text)) continue;
+                for (int j = i + 1; j < cells.size(); j++) {
+                    String value = normalizeCellText(cells.get(j).text());
+                    if (!value.isBlank()) return value;
+                }
+            }
+        }
+        return "";
+    }
+
+    private String deriveStatus(String subDate, String listDate) {
+        LocalDate today = LocalDate.now();
+        LocalDate subEnd = parseEndDate(subDate);
+        LocalDate list = parseSingleDate(listDate);
+
+        if (list != null && list.isBefore(today)) {
+            return "상장완료";
+        }
+        if (subEnd != null && (subEnd.isAfter(today) || subEnd.isEqual(today))) {
+            return "청약예정";
+        }
+        if (list != null && list.isAfter(today)) {
+            return "상장예정";
+        }
+        return "준비중";
+    }
+
+    private LocalDate parseSingleDate(String text) {
+        if (text == null || text.isBlank()) return null;
+        Matcher full = Pattern.compile("(\\d{4})\\.(\\d{2})\\.(\\d{2})").matcher(text);
+        if (full.find()) {
+            int y = Integer.parseInt(full.group(1));
+            int m = Integer.parseInt(full.group(2));
+            int d = Integer.parseInt(full.group(3));
+            return LocalDate.of(y, m, d);
+        }
+        return null;
+    }
+
     private String normalizeCellText(String text) {
         if (text == null) return "";
         return text.replace("\u00A0", " ")
                 .replace("&nbsp;", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private String blankToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isBlank() ? null : t;
     }
 
     private String findScheduleText(Elements tds) {
@@ -380,6 +483,28 @@ public class UpcomingIpoService {
     }
 
     private record Row(String corpName, String ipoNo, String detailUrl) {}
+
+    private record DetailInfo(
+            String underwriter,
+            String subDate,
+            String listDate,
+            String status,
+            String price,
+            String expectedPrice
+    ) {
+        boolean isBlank() {
+            return (underwriter == null || underwriter.isBlank())
+                    && (subDate == null || subDate.isBlank())
+                    && (listDate == null || listDate.isBlank())
+                    && (status == null || status.isBlank())
+                    && (price == null || price.isBlank())
+                    && (expectedPrice == null || expectedPrice.isBlank());
+        }
+
+        static DetailInfo empty() {
+            return new DetailInfo(null, null, null, null, null, null);
+        }
+    }
 
     private record Page(Document doc, String html, byte[] bytes) {
     }
