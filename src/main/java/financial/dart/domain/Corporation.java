@@ -43,6 +43,11 @@ public class Corporation {
     private String allocationDate;        // 배정공고일
     private String listingDate;           // 상장일 (미정)
 
+    // [유사 기업 종목 정보]
+    private Long marketCap;    // 시가총액
+    private Double per;        // 주가수익비율
+    private Double pbr;        // 주가순자산비율
+
     // --- [ 상장 적격성 판단 기준 ] ---
     // 상장, 등록 후에 3개월이 경과했는지
     private boolean isOver3Months;
