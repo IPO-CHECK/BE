@@ -37,6 +37,24 @@ public class UpcomingIpo {
     @Column(name = "industry", length = 500)
     private String industry;
 
+    @Column(name = "underwriter", length = 500)
+    private String underwriter;
+
+    @Column(name = "sub_date", length = 200)
+    private String subDate;
+
+    @Column(name = "list_date", length = 200)
+    private String listDate;
+
+    @Column(name = "status", length = 50)
+    private String status;
+
+    @Column(name = "price", length = 100)
+    private String price;
+
+    @Column(name = "expected_price", length = 100)
+    private String expectedPrice;
+
     protected UpcomingIpo() {}
 
     public UpcomingIpo(String corpName, String normalizedName, String corpCode, String ipoNo, String detailUrl) {
@@ -57,6 +75,12 @@ public class UpcomingIpo {
     public String getDetailUrl() { return detailUrl; }
     public String getRceptNo() { return rceptNo; }
     public String getIndustry() { return industry; }
+    public String getUnderwriter() { return underwriter; }
+    public String getSubDate() { return subDate; }
+    public String getListDate() { return listDate; }
+    public String getStatus() { return status; }
+    public String getPrice() { return price; }
+    public String getExpectedPrice() { return expectedPrice; }
 
     public void updateBasic(String corpName, String normalizedName, String corpCode, String detailUrl) {
         this.corpName = corpName;
@@ -72,5 +96,21 @@ public class UpcomingIpo {
 
     public void updateIndustry(String industry) {
         this.industry = industry;
+    }
+
+    public void updateOfferingInfo(
+            String underwriter,
+            String subDate,
+            String listDate,
+            String status,
+            String price,
+            String expectedPrice
+    ) {
+        this.underwriter = underwriter;
+        this.subDate = subDate;
+        this.listDate = listDate;
+        this.status = status;
+        this.price = price;
+        this.expectedPrice = expectedPrice;
     }
 }
