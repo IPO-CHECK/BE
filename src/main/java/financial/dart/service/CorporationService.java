@@ -1,7 +1,9 @@
 package financial.dart.service;
 
+import financial.dart.domain.CompareText;
 import financial.dart.domain.CorpFinRatio;
 import financial.dart.domain.Corporation;
+import financial.dart.dto.AnalysisDto;
 import financial.dart.dto.BasicDto;
 import financial.dart.dto.CompareDto;
 import financial.dart.repository.CorporationRepository;
@@ -29,6 +31,69 @@ public class CorporationService {
 
     private final CorporationRepository corporationRepository;
     private final RestTemplate restTemplate;
+
+    public AnalysisDto getAnalysisText(String corpCode) {
+        Long corpId = corporationRepository.findIdByCorpCode(corpCode).orElse(null);
+        List<CompareText> compareTexts = corporationRepository.findByCorpId(corpId);
+
+        // 1. 매출액증가율
+        Map<String, String> revGrowth = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            revGrowth.put(String.valueOf(ct.getCompareCorpId()), ct.getRevGrowth());
+        }
+        // 2. 순이익증가율
+        Map<String, String> niGrowth = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            niGrowth.put(String.valueOf(ct.getCompareCorpId()), ct.getNiGrowth());
+        }
+        // 3. 총자산증가율
+        Map<String, String> assetGrowth = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            assetGrowth.put(String.valueOf(ct.getCompareCorpId()), ct.getAssetGrowth());
+        }
+        // 4. 매출총이익률
+        Map<String, String> gpm = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            gpm.put(String.valueOf(ct.getCompareCorpId()), ct.getGpm());
+        }
+        // 5. 영업이익률
+        Map<String, String> opm = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            opm.put(String.valueOf(ct.getCompareCorpId()), ct.getOpm());
+        }
+        // 6. ROE
+        Map<String, String> roe = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            roe.put(String.valueOf(ct.getCompareCorpId()), ct.getRoe());
+        }
+        // 7. 부채비율
+        Map<String, String> debtRatio = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            debtRatio.put(String.valueOf(ct.getCompareCorpId()), ct.getDebtRatio());
+        }
+        // 8. 이자보상배율
+        Map<String, String> intCov = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            intCov.put(String.valueOf(ct.getCompareCorpId()), ct.getIntCov());
+        }
+        // 9. 자기자본비율
+        Map<String, String> capRatio = new HashMap<>();
+        for (CompareText ct : compareTexts) {
+            capRatio.put(String.valueOf(ct.getCompareCorpId()), ct.getCapRatio());
+        }
+
+        Map<String, Map<String, String>> analysisMap = new HashMap<>();
+        analysisMap.put("revGrowth", revGrowth);
+        analysisMap.put("niGrowth", niGrowth);
+        analysisMap.put("assetGrowth", assetGrowth);
+        analysisMap.put("gpm", gpm);
+        analysisMap.put("opm", opm);
+        analysisMap.put("roe", roe);
+        analysisMap.put("debtRatio", debtRatio);
+        analysisMap.put("intCov", intCov);
+        analysisMap.put("capRatio", capRatio);
+        return new AnalysisDto(analysisMap);
+    }
 
     /**
      * [심층 비교 분석]
@@ -440,7 +505,8 @@ public class CorporationService {
             try {
                 long value = Long.parseLong(matcher.group());
                 matcher.appendReplacement(sb, String.format("%,d주", value));
-            } catch (NumberFormatException e) {}
+            } catch (NumberFormatException e) {
+            }
         }
         matcher.appendTail(sb);
         return sb.toString();

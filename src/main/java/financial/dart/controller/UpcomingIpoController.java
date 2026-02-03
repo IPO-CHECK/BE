@@ -9,7 +9,6 @@ import financial.dart.repository.ListedCorpRepository;
 import financial.dart.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -128,16 +127,14 @@ public class UpcomingIpoController {
         return ResponseEntity.ok(detailDto);
     }
 
-    private String formatVector(double[] vec, String[] labels) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < vec.length && i < labels.length; i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(labels[i]).append("=").append(String.format("%.4f", vec[i]));
-        }
-        sb.append("]");
-        return sb.toString();
+    // 유사 기업 분석 텍스트 조회
+    @GetMapping("/{id}/analysis/insights")
+    public ResponseEntity<AnalysisDto> getSimilarityAnalysis(@PathVariable Long id) {
+        String corpCode = upcomingIpoService.findCorpCodeById(id);
+        return ResponseEntity.ok(corporationService.getAnalysisText(corpCode));
     }
 
+    // 리스크 분석
     @GetMapping("/{id}/risk-analysis")
     public ResponseEntity<RiskAnalysisResponse> riskAnalysis(@PathVariable Long id) {
         UpcomingIpoRiskAnalysis analysis = riskAnalysisService.getOrCreate(id);
@@ -150,7 +147,9 @@ public class UpcomingIpoController {
         ));
     }
 
-    /** @param id upcoming_ipo_id (FK). ipo_business_analysis.pk가 아님. 없으면 200 + 빈 본문. */
+    /**
+     * @param id upcoming_ipo_id (FK). ipo_business_analysis.pk가 아님. 없으면 200 + 빈 본문.
+     */
     @GetMapping("/{id}/business-analysis")
     public ResponseEntity<BusinessAnalysisResponse> businessAnalysis(@PathVariable Long id) {
         var opt = businessAnalysisService.findByUpcomingIpoId(id);
@@ -193,9 +192,12 @@ public class UpcomingIpoController {
             String overallSummary,
             java.util.List<CategoryItem> categories
     ) {
-        public record CategoryItem(String title, String grade, String reason, String gradeColor) {}
+        public record CategoryItem(String title, String grade, String reason, String gradeColor) {
+        }
 
-        /** 데이터 없을 때 200 OK로 내려줄 빈 응답 (프론트에서 목업으로 대체) */
+        /**
+         * 데이터 없을 때 200 OK로 내려줄 빈 응답 (프론트에서 목업으로 대체)
+         */
         public static BusinessAnalysisResponse empty() {
             return new BusinessAnalysisResponse("", java.util.List.of());
         }
@@ -257,5 +259,15 @@ public class UpcomingIpoController {
             // 기본값 및 그 외
             return "text-amber-600 bg-amber-50";
         }
+    }
+
+    private String formatVector(double[] vec, String[] labels) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vec.length && i < labels.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(labels[i]).append("=").append(String.format("%.4f", vec[i]));
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }

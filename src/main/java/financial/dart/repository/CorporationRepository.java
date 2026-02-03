@@ -1,5 +1,6 @@
 package financial.dart.repository;
 
+import financial.dart.domain.CompareText;
 import financial.dart.domain.CorpFinRatio;
 import financial.dart.domain.Corporation;
 import financial.dart.dto.UpcomingDto;
@@ -61,4 +62,7 @@ public interface CorporationRepository extends JpaRepository<Corporation, Long> 
     // [추가] 여러 기업의 재무비율을 한 번에 조회 (사업연도 오름차순)
     @Query("SELECT r FROM CorpFinRatio r WHERE r.corporation.id IN :corpIds ORDER BY r.bsnsYear ASC")
     List<CorpFinRatio> findByCorporationIdInOrderByBsnsYearAsc(@Param("corpIds") List<Long> corpIds);
+
+    @Query("SELECT ct FROM CompareText ct WHERE ct.corpId = :corpId")
+    List<CompareText> findByCorpId(@Param("corpId") Long corpId);
 }
