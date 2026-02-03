@@ -3,6 +3,9 @@ package financial.dart.controller;
 import financial.dart.domain.Financial;
 import financial.dart.domain.UpcomingIpo;
 import financial.dart.domain.UpcomingIpoRiskAnalysis;
+import financial.dart.dto.BasicDto;
+import financial.dart.dto.DetailDto;
+import financial.dart.dto.FinancialsDto;
 import financial.dart.dto.UpcomingDto;
 import financial.dart.repository.ListedCorpRepository;
 import financial.dart.service.*;
@@ -28,33 +31,13 @@ public class UpcomingIpoController {
     private final SimilarityService similarityService;
     private final ListedCorpRepository listedCorpRepository;
 
-    @PostMapping("/refresh")
-    public ResponseEntity<List<UpcomingIpo>> refresh() {
-        return ResponseEntity.ok(upcomingIpoService.refreshFrom38());
-    }
-
-    @GetMapping
-    public ResponseEntity<List<UpcomingIpo>> list() {
-        return ResponseEntity.ok(upcomingIpoService.listAll());
-    }
-
     // 메인 화면에서 신규 상장 종목 리스트 조회
     @GetMapping("/list")
     public ResponseEntity<List<UpcomingDto>> mainPageList() {
         return ResponseEntity.ok(upcomingIpoService.mainPageList());
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<UpcomingIpo> get(@PathVariable Long id) {
-        return ResponseEntity.ok(upcomingIpoService.getById(id));
-    }
-
-//    @GetMapping("/{id}/similar")
-//    public ResponseEntity<UpcomingIpoSimilarResponse> similar(@PathVariable Long id) {
-//        return ResponseEntity.ok(upcomingIpoSimilarService.findSimilar(id));
-//    }
-
-    // 상세 정보 조회
+    // 상세 정보 -> 유사도 분석
     @GetMapping("/{id}/details")
     public ResponseEntity<Void> test(@PathVariable Long id) {
         String corpCode = upcomingIpoService.findCorpCodeById(id);
@@ -124,6 +107,28 @@ public class UpcomingIpoController {
         return ResponseEntity.ok().build();
     }
 
+    // 상세 정보 (기본 재무정보 조회)
+    @GetMapping("/{id}/financials")
+    public ResponseEntity<DetailDto> getFinancials(@PathVariable Long id) {
+        String corpCode = upcomingIpoService.findCorpCodeById(id);
+
+        // 1. 상단 기본 재무 정보 조회
+        BasicDto basic = corporationService.getBasicDetail(corpCode);
+
+        // 2. 실적추이 (매출액, 영업이익, 순이익)
+        Long corpId = corporationService.findCorporationIdByCorpCode(corpCode);
+        FinancialsDto financials = financialService.getFinancials(corpId);
+
+        // TODO 나머지 데이터 채우기
+
+        DetailDto detailDto = DetailDto.builder()
+                .basic(basic)
+                .financials(financials)
+                .build();
+
+        return ResponseEntity.ok(detailDto);
+    }
+
     private String formatVector(double[] vec, String[] labels) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < vec.length && i < labels.length; i++) {
@@ -144,6 +149,26 @@ public class UpcomingIpoController {
                 analysis.getAnalysisText(),
                 analysis.getUpdatedAt().toString()
         ));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UpcomingIpo> get(@PathVariable Long id) {
+        return ResponseEntity.ok(upcomingIpoService.getById(id));
+    }
+
+//    @GetMapping("/{id}/similar")
+//    public ResponseEntity<UpcomingIpoSimilarResponse> similar(@PathVariable Long id) {
+//        return ResponseEntity.ok(upcomingIpoSimilarService.findSimilar(id));
+//    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<List<UpcomingIpo>> refresh() {
+        return ResponseEntity.ok(upcomingIpoService.refreshFrom38());
+    }
+
+    @GetMapping
+    public ResponseEntity<List<UpcomingIpo>> list() {
+        return ResponseEntity.ok(upcomingIpoService.listAll());
     }
 
     public record RiskAnalysisResponse(

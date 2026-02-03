@@ -6,26 +6,14 @@ import java.util.List;
 import java.util.Map;
 
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class DetailDto {
 
     // --- 1. 기본 정보 ---
-    private Long id;
-    private String name;
-    private String code;
-    private String industry;
-    private String market;
-    private String products;
-    private String expectedPrice;
-    private String finalPrice;
-    private String publicShares;
-    private String generalShares;
-    private String underwriter;
-
-    // --- 2. 일정 (Schedule) ---
-    private List<ScheduleDto> schedule;
+    private BasicDto basic;
 
     // --- 3. 재무제표 (Financials) ---
     private FinancialsDto financials;
@@ -41,25 +29,6 @@ public class DetailDto {
 
     // --- 7. 리스크 리포트 (Risk Report) ---
     private RiskReportDto riskReport;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ScheduleDto {
-        private String step;
-        private String date;
-        private String status; // "done", "active", "future"
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class FinancialsDto {
-        private List<String> quarters;
-        private List<Long> revenue;
-        private List<Long> opProfit;
-        private List<Long> netIncome;
-    }
 
     @Data
     @NoArgsConstructor

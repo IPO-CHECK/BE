@@ -3,6 +3,7 @@ package financial.dart.service;
 import financial.dart.domain.Corporation;
 import financial.dart.domain.DartConstants;
 import financial.dart.domain.Financial;
+import financial.dart.dto.FinancialsDto;
 import financial.dart.repository.CorporationRepository;
 import financial.dart.repository.FinancialRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +29,44 @@ public class FinancialService {
     @Value("${dart.api-key}")
     private String apiKey;
 
+    public FinancialsDto getFinancials(Long corpId) {
+        List<Financial> financials = financialRepository.findByCorporationIdOrderByBsnsYearAsc(corpId);
+        List<String> staticQuarters = List.of("22(1~4Q)", "23(1~4Q)", "24(1~4Q)", "25(1~3Q)");
+        return FinancialsDto.builder()
+                .quarters(staticQuarters)
+                .revenue(getRevenueList(financials))
+                .opProfit(getOpProfitList(financials))
+                .netIncome(getNetIncomeList(financials))
+                .build();
+    }
+
+    private List<Long> getRevenueList(List<Financial> financials) {
+        List<Long> revenues = new ArrayList<>();
+        for (Financial f : financials) {
+            revenues.add(toMillion(f.getRevenue()));
+        }
+        return revenues;
+    }
+
+    private List<Long> getOpProfitList(List<Financial> financials) {
+        List<Long> opProfits = new ArrayList<>();
+        for (Financial f : financials) {
+            opProfits.add(toMillion(f.getOp()));
+        }
+        return opProfits;
+    }
+
+    private List<Long> getNetIncomeList(List<Financial> financials) {
+        List<Long> netIncomes = new ArrayList<>();
+        for (Financial f : financials) {
+            netIncomes.add(toMillion(f.getNi()));
+        }
+        return netIncomes;
+    }
+
+
     // 가장 최근 분기 재무제표 조회
-    public Financial findByCorporationId(Long corpId){
+    public Financial findByCorporationId(Long corpId) {
         return financialRepository.findByCorporationId(corpId).orElse(null);
     }
 
@@ -234,5 +271,11 @@ public class FinancialService {
         else if (quarter == 2) return "11012";
         else if (quarter == 3) return "11014";
         else return "11011";
+    }
+
+    private Long toMillion(Long won) {
+        if (won == null) return 0L;
+        // 1,000,000으로 나누어 '백만 원' 단위로 변환
+        return won / 1_000_000L;
     }
 }
