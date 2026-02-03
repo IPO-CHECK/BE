@@ -27,9 +27,6 @@ public class DetailDto {
     // --- 6. 가치 평가 (Valuation) ---
     private ValuationDto valuation;
 
-    // --- 7. 리스크 리포트 (Risk Report) ---
-    private RiskReportDto riskReport;
-
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -111,23 +108,4 @@ public class DetailDto {
         private String value;
     }
 
-    // --- Risk Report Structure ---
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RiskReportDto {
-        private String grade;
-        private Integer score;
-        private List<String> aiSummary;
-        private List<RiskFactorDto> factors;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class RiskFactorDto {
-        private String title;
-        private String desc;
-        private String severity; // "high", "medium", "low"
-    }
 }
