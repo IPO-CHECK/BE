@@ -26,7 +26,8 @@ public class UpcomingIpoSimilarService {
         this.similarSearchService = similarSearchService;
     }
 
-    public UpcomingIpoSimilarResponse findSimilar(Long upcomingIpoId) {
+    // UpcomingIpoSimilarResponse
+    public List<Long> findSimilar(Long upcomingIpoId) {
         UpcomingIpo ipo = upcomingIpoService.getById(upcomingIpoId);
 
         String rceptNo = ipo.getRceptNo();
@@ -39,7 +40,8 @@ public class UpcomingIpoSimilarService {
         }
 
         if (rceptNo == null || rceptNo.isBlank()) {
-            return new UpcomingIpoSimilarResponse("", List.of());
+//            return new UpcomingIpoSimilarResponse("", List.of());
+            return List.of();
         }
 
         var sections = corpSectionMainXmlService.fetchSectionsByRcpNo(rceptNo);
@@ -49,7 +51,11 @@ public class UpcomingIpoSimilarService {
         upcomingIpoService.updateIndustryIfEmpty(ipo, industrySummary);
 
         List<SimilarListedCorpResult> similar = similarSearchService.search(businessOverview, 10);
-        return new UpcomingIpoSimilarResponse(businessOverview, similar);
+
+        return similar.stream()
+                .map(SimilarListedCorpResult::corpId)
+                .toList();
+//        return new UpcomingIpoSimilarResponse(businessOverview, similar);
     }
 
     private String summarizeForIndustry(String text) {
