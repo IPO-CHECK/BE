@@ -1,6 +1,7 @@
 package financial.dart.controller;
 
 import financial.dart.domain.Financial;
+import financial.dart.domain.IpoBusinessAnalysis;
 import financial.dart.domain.UpcomingIpo;
 import financial.dart.domain.UpcomingIpoRiskAnalysis;
 import financial.dart.dto.*;
@@ -8,6 +9,7 @@ import financial.dart.repository.ListedCorpRepository;
 import financial.dart.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,7 @@ public class UpcomingIpoController {
     private final UpcomingIpoService upcomingIpoService;
     private final UpcomingIpoSimilarService upcomingIpoSimilarService;
     private final UpcomingIpoRiskAnalysisService riskAnalysisService;
+    private final IpoBusinessAnalysisService businessAnalysisService;
     private final CorporationService corporationService;
     private final FinancialService financialService;
     private final SimilarityService similarityService;
@@ -147,6 +150,16 @@ public class UpcomingIpoController {
         ));
     }
 
+    /** @param id upcoming_ipo_id (FK). ipo_business_analysis.pk가 아님. 없으면 200 + 빈 본문. */
+    @GetMapping("/{id}/business-analysis")
+    public ResponseEntity<BusinessAnalysisResponse> businessAnalysis(@PathVariable Long id) {
+        var opt = businessAnalysisService.findByUpcomingIpoId(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.ok(BusinessAnalysisResponse.empty());
+        }
+        return ResponseEntity.ok(BusinessAnalysisResponse.from(opt.get()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<UpcomingIpo> get(@PathVariable Long id) {
         return ResponseEntity.ok(upcomingIpoService.getById(id));
@@ -174,5 +187,75 @@ public class UpcomingIpoController {
             String analysisText,
             String updatedAt
     ) {
+    }
+
+    public record BusinessAnalysisResponse(
+            String overallSummary,
+            java.util.List<CategoryItem> categories
+    ) {
+        public record CategoryItem(String title, String grade, String reason, String gradeColor) {}
+
+        /** 데이터 없을 때 200 OK로 내려줄 빈 응답 (프론트에서 목업으로 대체) */
+        public static BusinessAnalysisResponse empty() {
+            return new BusinessAnalysisResponse("", java.util.List.of());
+        }
+
+        public static BusinessAnalysisResponse from(IpoBusinessAnalysis a) {
+            String monetizationGrade = withDefaultGrade(a.getMonetizationGrade());
+            String scalabilityGrade = withDefaultGrade(a.getScalabilityGrade());
+            String structuralRiskGrade = withDefaultGrade(a.getStructuralRiskGrade());
+            String resourceCapabilityGrade = withDefaultGrade(a.getResourceCapabilityGrade());
+            return new BusinessAnalysisResponse(
+                    a.getSummaryFinal() != null ? a.getSummaryFinal() : "",
+                    java.util.List.of(
+                            new CategoryItem(
+                                    "수익화 구조 (Revenue Structure)",
+                                    monetizationGrade,
+                                    nullToEmpty(a.getMonetizationStructure()),
+                                    gradeColor(monetizationGrade)
+                            ),
+                            new CategoryItem(
+                                    "확장성 (Scalability)",
+                                    scalabilityGrade,
+                                    nullToEmpty(a.getScalability()),
+                                    gradeColor(scalabilityGrade)
+                            ),
+                            new CategoryItem(
+                                    "구조적 리스크 (Structural Risk)",
+                                    structuralRiskGrade,
+                                    nullToEmpty(a.getStructuralRisk()),
+                                    gradeColor(structuralRiskGrade)
+                            ),
+                            new CategoryItem(
+                                    "자원 확보 (Resource Investment)",
+                                    resourceCapabilityGrade,
+                                    nullToEmpty(a.getResourceCapability()),
+                                    gradeColor(resourceCapabilityGrade)
+                            )
+                    )
+            );
+        }
+
+        private static String nullToEmpty(String s) {
+            return s != null ? s : "";
+        }
+
+        private static String withDefaultGrade(String grade) {
+            if (grade == null || grade.isBlank()) {
+                return "중";
+            }
+            return grade;
+        }
+
+        private static String gradeColor(String grade) {
+            if ("상".equals(grade)) {
+                return "text-green-600 bg-green-50";
+            }
+            if ("하".equals(grade)) {
+                return "text-red-600 bg-red-50";
+            }
+            // 기본값 및 그 외
+            return "text-amber-600 bg-amber-50";
+        }
     }
 }
