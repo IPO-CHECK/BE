@@ -3,10 +3,7 @@ package financial.dart.controller;
 import financial.dart.domain.Financial;
 import financial.dart.domain.UpcomingIpo;
 import financial.dart.domain.UpcomingIpoRiskAnalysis;
-import financial.dart.dto.BasicDto;
-import financial.dart.dto.DetailDto;
-import financial.dart.dto.FinancialsDto;
-import financial.dart.dto.UpcomingDto;
+import financial.dart.dto.*;
 import financial.dart.repository.ListedCorpRepository;
 import financial.dart.service.*;
 import lombok.RequiredArgsConstructor;
@@ -102,8 +99,6 @@ public class UpcomingIpoController {
                     zStr);
         }
 
-        // TODO 비재무정보 반영하기
-
         return ResponseEntity.ok().build();
     }
 
@@ -119,11 +114,12 @@ public class UpcomingIpoController {
         Long corpId = corporationService.findCorporationIdByCorpCode(corpCode);
         FinancialsDto financials = financialService.getFinancials(corpId);
 
-        // TODO 나머지 데이터 채우기
+        CompareDto compare = corporationService.getCompareDetail(corpId);
 
         DetailDto detailDto = DetailDto.builder()
                 .basic(basic)
                 .financials(financials)
+                .compare(compare)
                 .build();
 
         return ResponseEntity.ok(detailDto);

@@ -1,11 +1,13 @@
 package financial.dart.service;
 
+import financial.dart.domain.CorpFinRatio;
 import financial.dart.domain.Corporation;
 import financial.dart.dto.BasicDto;
-import financial.dart.dto.DetailDto;
+import financial.dart.dto.CompareDto;
 import financial.dart.repository.CorporationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -13,14 +15,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CorporationService {
 
     @Value("${dart.api-key}")
@@ -28,6 +29,197 @@ public class CorporationService {
 
     private final CorporationRepository corporationRepository;
     private final RestTemplate restTemplate;
+
+    /**
+     * [심층 비교 분석]
+     * 내 기업(Target)과 유사 기업(Peers)의 재무 비율 및 성장성 지표를 비교하여 DTO로 반환합니다.
+     */
+    public CompareDto getCompareDetail(Long corpId) {
+        // 1. Target(내 기업)과 Peers(유사 기업) ID 식별
+        List<Long> peerIds = corporationRepository.findTargetCorpIdsByCorpId(corpId);
+
+        // 모든 관련 ID 리스트 (Target + Peers)
+        List<Long> allIds = new ArrayList<>();
+        allIds.add(corpId);
+        allIds.addAll(peerIds);
+
+        // 2. 기업 정보 및 재무 비율 데이터 일괄 조회
+        // Corporation 정보 조회 (시총, PER, PBR 등)
+        List<Corporation> allCorps = corporationRepository.findAllById(allIds);
+        // 재무 비율 데이터 조회 (연도별 오름차순 정렬됨)
+        List<CorpFinRatio> allRatios = corporationRepository.findByCorporationIdInOrderByBsnsYearAsc(allIds);
+
+        // 3. 데이터를 Map으로 그룹화 (Key: CorpId, Value: 비율 리스트 / Corporation 객체)
+        Map<Long, List<CorpFinRatio>> ratioMap = allRatios.stream()
+                .collect(Collectors.groupingBy(r -> r.getCorporation().getId()));
+
+        Map<Long, Corporation> corpMap = allCorps.stream()
+                .collect(Collectors.toMap(Corporation::getId, c -> c));
+
+        // 4. PeerDto 리스트 생성 (경쟁사 기본 정보)
+        List<CompareDto.PeerDto> peerDtos = peerIds.stream()
+                .map(id -> {
+                    Corporation c = corpMap.get(id);
+                    // c가 null일 경우(DB 정합성 문제) 안전하게 처리
+                    if (c == null) return null;
+
+                    return new CompareDto.PeerDto(
+                            c.getId(),
+                            c.getCorpName(),
+                            formatMarketCap(c.getMarketCap()), // 시가총액 포맷팅 (예: 1조 1500억)
+                            formatRatio(c.getPer()),           // PER 포맷팅 (예: 16.50배)
+                            formatRatio(c.getPbr())            // PBR 포맷팅 (예: 1.20배)
+                    );
+                })
+                .filter(Objects::nonNull) // null 제외
+                .collect(Collectors.toList());
+
+        // 5. 심층 지표 (Deep Metrics) 구성
+        // 각 카테고리별(성장성, 수익성, 안정성) 차트 데이터 생성
+
+        // (1) 성장성 (BigDecimal 타입 필드)
+        CompareDto.MetricCategoryDto growth = buildMetricCategory(
+                "성장성", corpId, peerIds, ratioMap,
+                List.of(
+                        new MetricDef("revGrowth", "매출액증가율", "%", CorpFinRatio::getRevGrowth),
+                        new MetricDef("niGrowth", "순이익증가율", "%", CorpFinRatio::getNiGrowth),
+                        new MetricDef("assetGrowth", "총자산증가율", "%", CorpFinRatio::getAssetGrowth)
+                )
+        );
+
+        // (2) 수익성 (Float 타입 필드)
+        CompareDto.MetricCategoryDto profit = buildMetricCategory(
+                "수익성", corpId, peerIds, ratioMap,
+                List.of(
+                        new MetricDef("gpm", "매출총이익률", "%", CorpFinRatio::getGpm),
+                        new MetricDef("opm", "영업이익률", "%", CorpFinRatio::getOpm),
+                        new MetricDef("roe", "ROE", "%", CorpFinRatio::getRoe)
+                )
+        );
+
+        // (3) 안정성 (BigDecimal 타입 필드)
+        CompareDto.MetricCategoryDto stability = buildMetricCategory(
+                "안정성", corpId, peerIds, ratioMap,
+                List.of(
+                        new MetricDef("debtRatio", "부채비율", "%", CorpFinRatio::getDebtRatio),
+                        new MetricDef("intCov", "이자보상배율", "배", CorpFinRatio::getIntCov),
+                        new MetricDef("capRatio", "자기자본비율", "%", CorpFinRatio::getCapRatio)
+                )
+        );
+
+        // 6. 최종 DTO 반환
+        return CompareDto.builder()
+                .peers(peerDtos)
+                .deepMetrics(new CompareDto.DeepMetricsDto(growth, profit, stability))
+                .build();
+    }
+
+    // --- [심층 지표 생성을 위한 내부 레코드 및 메서드] ---
+
+    // 지표 정의 레코드: 키, 이름, 단위, 값 추출 함수(Number 타입 반환)
+    private record MetricDef(String key, String name, String unit, Function<CorpFinRatio, Number> extractor) {
+    }
+
+    // 카테고리 빌더 (Items + Data 생성)
+    private CompareDto.MetricCategoryDto buildMetricCategory(
+            String label,
+            Long targetId,
+            List<Long> peerIds,
+            Map<Long, List<CorpFinRatio>> ratioMap,
+            List<MetricDef> metricDefs
+    ) {
+        // 1. Items 생성 (선택 가능한 지표 목록)
+        List<CompareDto.MetricItemDto> items = metricDefs.stream()
+                .map(def -> new CompareDto.MetricItemDto(def.key(), def.name(), def.unit()))
+                .collect(Collectors.toList());
+
+        // 2. Data Map 생성 (실제 차트 데이터)
+        Map<String, CompareDto.MetricChartDataDto> dataMap = new HashMap<>();
+
+        for (MetricDef def : metricDefs) {
+            dataMap.put(def.key(), createChartData(targetId, peerIds, ratioMap, def.extractor()));
+        }
+
+        return CompareDto.MetricCategoryDto.builder()
+                .label(label)
+                .items(items)
+                .data(dataMap)
+                .build();
+    }
+
+    // 차트 데이터 생성 (Target, Peers, Avg 계산)
+    private CompareDto.MetricChartDataDto createChartData(
+            Long targetId,
+            List<Long> peerIds,
+            Map<Long, List<CorpFinRatio>> ratioMap,
+            Function<CorpFinRatio, Number> valueExtractor
+    ) {
+        // 1. Target Data 추출
+        List<Number> targetData = extractValues(ratioMap.get(targetId), valueExtractor);
+
+        // 2. Peers Data 추출 및 Map 생성
+        Map<String, List<Number>> peersDataMap = new HashMap<>();
+        List<List<Number>> allPeersValues = new ArrayList<>(); // 평균 계산용
+
+        for (Long peerId : peerIds) {
+            List<Number> pValues = extractValues(ratioMap.get(peerId), valueExtractor);
+            peersDataMap.put(String.valueOf(peerId), pValues);
+
+            if (!pValues.isEmpty()) {
+                allPeersValues.add(pValues);
+            }
+        }
+
+        // 3. Avg Data (업계 평균) 계산
+        List<Number> avgData = calculateAverage(allPeersValues);
+
+        return CompareDto.MetricChartDataDto.builder()
+                .target(targetData)
+                .peers(peersDataMap)
+                .avg(avgData)
+                .build();
+    }
+
+    // 값 추출 (Null 처리 및 Number 타입 통일)
+    private List<Number> extractValues(List<CorpFinRatio> ratios, Function<CorpFinRatio, Number> valueExtractor) {
+        if (ratios == null || ratios.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return ratios.stream()
+                .map(ratio -> {
+                    Number val = valueExtractor.apply(ratio);
+                    // 데이터가 null이면 0으로 처리 (차트 깨짐 방지)
+                    return val != null ? val : 0;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 연도별 평균 계산
+    private List<Number> calculateAverage(List<List<Number>> allPeersValues) {
+        if (allPeersValues.isEmpty()) return Collections.emptyList();
+
+        // 첫 번째 Peer의 데이터 길이를 기준으로 연도 개수 설정 (보통 3~4년치)
+        int years = allPeersValues.get(0).size();
+        List<Number> averages = new ArrayList<>();
+
+        for (int i = 0; i < years; i++) {
+            double sum = 0;
+            int count = 0;
+            for (List<Number> peerVals : allPeersValues) {
+                // 데이터 길이가 다를 경우 안전하게 처리
+                if (i < peerVals.size()) {
+                    sum += peerVals.get(i).doubleValue();
+                    count++;
+                }
+            }
+            // 소수점 둘째 자리까지 반올림
+            double avg = count > 0 ? sum / count : 0.0;
+            averages.add(Math.round(avg * 100.0) / 100.0);
+        }
+        return averages;
+    }
+
+    // --- [기본 정보 조회 관련 메서드] ---
 
     public BasicDto getBasicDetail(String corpCode) {
         Corporation corp = corporationRepository.findByCorpCode(corpCode);
@@ -47,16 +239,6 @@ public class CorporationService {
                 .build();
     }
 
-    @Transactional
-    public void saveCorporationData(List<Corporation> corporations) {
-        try {
-            corporationRepository.deleteAllInBatch();
-            corporationRepository.saveAll(corporations);
-        } catch (Exception e) {
-            throw new RuntimeException("데이터 동기화 실패", e);
-        }
-    }
-
     public Long findCorporationIdByCorpCode(String corpCode) {
         return corporationRepository.findIdByCorpCode(corpCode).orElse(null);
     }
@@ -69,54 +251,65 @@ public class CorporationService {
         return corporationRepository.findQualifiedCorporationIds();
     }
 
-    // [1번 기준 로직] 상장, 등록 후에 3개월이 경과할 것
-    // TODO DART에서는 상장일을 구할 수가 없어서 대체 로직을 짠건데 문제 있는 듯
+    @Transactional
+    public void saveCorporationData(List<Corporation> corporations) {
+        try {
+            corporationRepository.deleteAllInBatch();
+            corporationRepository.saveAll(corporations);
+        } catch (Exception e) {
+            throw new RuntimeException("데이터 동기화 실패", e);
+        }
+    }
+
+    // --- [ 상장 적격성 판단 로직 (DART API 연동) ] ---
+
+    // 1. 상장 후 3개월 경과 여부 확인
     @Transactional
     public void checkListingDate(String corpCode) {
         String url = UriComponentsBuilder.fromUriString("https://opendart.fss.or.kr/api/list.json")
                 .queryParam("crtfc_key", apiKey)
                 .queryParam("corp_code", corpCode)
                 .queryParam("bgn_de", "19500101")
-                .queryParam("pblntf_ty", "A")    // 핵심: 'A'는 사업/반기/분기보고서만 가져옵니다
+                .queryParam("pblntf_ty", "A")
                 .queryParam("sort", "date")
-                .queryParam("sort_mth", "asc")   // 옛날순
-                .queryParam("page_count", "30")  // 넉넉하게 30건 정도 가져와서 검사
+                .queryParam("sort_mth", "asc")
+                .queryParam("page_count", "30")
                 .toUriString();
 
-        Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-        List<Map<String, String>> list = (List<Map<String, String>>) response.get("list");
-        Corporation corporation = corporationRepository.findByCorpCode(corpCode);
+        try {
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            List<Map<String, String>> list = (List<Map<String, String>>) response.get("list");
+            Corporation corporation = corporationRepository.findByCorpCode(corpCode);
 
-        // 1. 데이터가 아예 없으면 -> 판단 불가(탈락) 후 종료
-        if (list == null || list.isEmpty()) {
-            corporation.updateIsOver3Months(false);
-            return; //
-        }
-
-        // 2. 데이터가 있으면 로직 수행
-        String businessReportDt = null;
-        for (Map<String, String> report : list) {
-            if (report.get("report_nm").contains("사업보고서")) {
-                businessReportDt = report.get("rcept_dt");
-                break;
+            if (list == null || list.isEmpty()) {
+                corporation.updateIsOver3Months(false);
+                return;
             }
+
+            String businessReportDt = null;
+            for (Map<String, String> report : list) {
+                if (report.get("report_nm").contains("사업보고서")) {
+                    businessReportDt = report.get("rcept_dt");
+                    break;
+                }
+            }
+
+            if (businessReportDt == null) {
+                businessReportDt = list.get(0).get("rcept_dt");
+            }
+
+            LocalDate firstDate = LocalDate.parse(businessReportDt, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            boolean result = firstDate.isBefore(LocalDate.now().minusMonths(3));
+            corporation.updateIsOver3Months(result);
+
+        } catch (Exception e) {
+            log.error("Error checking listing date for {}: {}", corpCode, e.getMessage());
         }
-
-        if (businessReportDt == null) {
-            businessReportDt = list.get(0).get("rcept_dt");
-        }
-
-        LocalDate firstDate = LocalDate.parse(businessReportDt, DateTimeFormatter.ofPattern("yyyyMMdd"));
-        boolean result = firstDate.isBefore(LocalDate.now().minusMonths(3));
-
-        // 결과 저장
-        corporation.updateIsOver3Months(result);
     }
 
-    // [Criterion 2] 최근 2년간 감사의견이 ‘적정’일 것
+    // 2. 최근 2년간 감사의견 적정 여부 확인
     @Transactional
     public void checkAuditOpinion(String corpCode) {
-        // 최근 2년치
         int currentYear = LocalDate.now().getYear();
         String[] years = {String.valueOf(currentYear - 1), String.valueOf(currentYear - 2)};
         Corporation corporation = corporationRepository.findByCorpCode(corpCode);
@@ -126,40 +319,36 @@ public class CorporationService {
                     .queryParam("crtfc_key", apiKey)
                     .queryParam("corp_code", corpCode)
                     .queryParam("bsns_year", year)
-                    .queryParam("reprt_code", "11011") // 사업보고서 고정
+                    .queryParam("reprt_code", "11011")
                     .toUriString();
 
             try {
                 Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-
-                // 데이터 없거나 리스트 비었으면 -> 뭔가 문제 있음 -> 탈락
                 if (response == null || response.get("list") == null) {
                     corporation.updateHasUnqualifiedOpinion(false);
-                    return; //
+                    return;
                 }
 
                 List<Map<String, String>> list = (List<Map<String, String>>) response.get("list");
                 if (list.isEmpty()) {
                     corporation.updateHasUnqualifiedOpinion(false);
-                    return; //
+                    return;
                 }
 
                 String opinion = list.get(0).get("adt_opinion");
-
-                // "적정"이 아니면 -> 탈락
                 if (opinion == null || !opinion.contains("적정")) {
                     corporation.updateHasUnqualifiedOpinion(false);
-                    return; //
+                    return;
                 }
 
             } catch (Exception e) {
-                System.err.println("API 오류: " + e.getMessage());
+                log.error("Error checking audit opinion for {}: {}", corpCode, e.getMessage());
             }
         }
-        corporation.updateHasUnqualifiedOpinion(true); // 2년 모두 적정이면 통과
+        corporation.updateHasUnqualifiedOpinion(true);
     }
 
-    // [3번 기준 로직] 최근 2년간 경영에 중대한 영향을 미칠 수 있는 합병, 영업의 양수도, 분할이 없을 것
+    // 3. 최근 2년간 M&A 이슈 여부 확인
     @Transactional
     public void checkMnAHistory(String corpCode) {
         String twoYearsAgo = LocalDate.now().minusYears(2).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -174,33 +363,35 @@ public class CorporationService {
                     .queryParam("pblntf_detail_ty", detail)
                     .toUriString();
 
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-
-            // 1. response 자체가 null인지 확인
-            if (response != null && !"0".equals(String.valueOf(response.get("total_count")))) {
-                List<Map<String, String>> reports = (List<Map<String, String>>) response.get("list");
-
-                // 🌟 [핵심 수정] reports가 null이 아닌지 한 번 더 확인합니다!
-                if (reports != null) {
-                    for (Map<String, String> report : reports) {
-                        String reportNm = report.get("report_nm");
-                        if (reportNm != null && (reportNm.contains("합병") || reportNm.contains("분할") ||
-                                reportNm.contains("양수") || reportNm.contains("양도"))) {
-                            corporation.updateHasNoMajorChanges(false);
-                            return;
+            try {
+                Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+                if (response != null && !"0".equals(String.valueOf(response.get("total_count")))) {
+                    List<Map<String, String>> reports = (List<Map<String, String>>) response.get("list");
+                    if (reports != null) {
+                        for (Map<String, String> report : reports) {
+                            String reportNm = report.get("report_nm");
+                            if (reportNm != null && (reportNm.contains("합병") || reportNm.contains("분할") ||
+                                    reportNm.contains("양수") || reportNm.contains("양도"))) {
+                                corporation.updateHasNoMajorChanges(false);
+                                return;
+                            }
                         }
                     }
                 }
+            } catch (Exception e) {
+                log.error("Error checking M&A history for {}: {}", corpCode, e.getMessage());
             }
         }
         corporation.updateHasNoMajorChanges(true);
     }
 
+    // --- [Helper Methods] ---
+
+    // 일정 빌더
     private List<BasicDto.ScheduleDto> buildSchedule(Corporation corp) {
         List<BasicDto.ScheduleDto> schedules = new ArrayList<>();
-        LocalDate today = LocalDate.now(); // 오늘 날짜: 2026-02-03
+        LocalDate today = LocalDate.now();
 
-        // 1. 모든 단계를 리스트에 추가 (기본 addStep 로직 수행)
         addStep(schedules, "예비심사청구", corp.getPreliminaryReviewDate(), today);
         addStep(schedules, "심사승인", corp.getApprovalDate(), today);
         addStep(schedules, "청약공고", corp.getSubscriptionNoticeDate(), today);
@@ -209,21 +400,16 @@ public class CorporationService {
         addStep(schedules, "배정공고", corp.getAllocationDate(), today);
         addStep(schedules, "상장일", corp.getListingDate(), today);
 
-        // 2. 리스트에 "active" 상태인 일정이 있는지 확인
-        boolean hasActive = schedules.stream()
-                .anyMatch(s -> "active".equals(s.getStatus()));
+        boolean hasActive = schedules.stream().anyMatch(s -> "active".equals(s.getStatus()));
 
-        // 3. 오늘 날짜와 딱 맞는 일정이 없어 active가 비어있다면,
-        //    future 중 가장 빠른 것(리스트 상의 첫 번째 future)을 active로 변경
         if (!hasActive) {
             for (BasicDto.ScheduleDto schedule : schedules) {
                 if ("future".equals(schedule.getStatus())) {
                     schedule.setStatus("active");
-                    break; // 가장 빠른 하나만 찾으면 루프 종료
+                    break;
                 }
             }
         }
-
         return schedules;
     }
 
@@ -232,42 +418,56 @@ public class CorporationService {
 
         String status = "future";
         try {
-            // "2026.03.11" 또는 "2026.03.11 ~ 2026.03.12" 형식 처리
             String compareDate = dateStr.contains("~") ? dateStr.split("~")[0].trim() : dateStr;
             LocalDate targetDate = LocalDate.parse(compareDate.replace(".", "-"));
 
             if (targetDate.isBefore(today)) status = "done";
             else if (targetDate.isEqual(today)) status = "active";
         } catch (Exception e) {
-            // "미정" 등의 문자열 처리
             status = "future";
         }
-
         list.add(new BasicDto.ScheduleDto(step, dateStr, status));
     }
 
-    // 범위 문자열을 위한 포맷팅 메서드
+    // 주식수 범위 포맷팅
     private String formatSharesRange(String shares) {
-        if (shares == null || shares.isEmpty() || shares.equals("미정")) {
-            return shares;
-        }
-
-        // 1. 기존에 혹시 있을지 모를 콤마(,)를 제거하고 숫자를 찾습니다.
+        if (shares == null || shares.isEmpty() || shares.equals("미정")) return shares;
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\d+");
         java.util.regex.Matcher matcher = pattern.matcher(shares.replace(",", ""));
         StringBuilder sb = new StringBuilder();
 
         while (matcher.find()) {
             try {
-                // 2. 찾은 숫자를 파싱하여 3자리 콤마 + '주' 포맷으로 변경
                 long value = Long.parseLong(matcher.group());
                 matcher.appendReplacement(sb, String.format("%,d주", value));
-            } catch (NumberFormatException e) {
-                // 파싱 실패 시 해당 부분은 원본 유지 (안전 장치)
-            }
+            } catch (NumberFormatException e) {}
         }
         matcher.appendTail(sb);
-
         return sb.toString();
+    }
+
+    // 시가총액 포맷팅 (Long -> "1조 2000억" or "5000억")
+    private String formatMarketCap(Long marketCap) {
+        if (marketCap == null || marketCap == 0) return "-";
+        long trillion = 1_000_000_000_000L;
+        long hundredMillion = 100_000_000L;
+
+        StringBuilder sb = new StringBuilder();
+        long cho = marketCap / trillion;
+        long uk = (marketCap % trillion) / hundredMillion;
+
+        if (cho > 0) {
+            sb.append(cho).append("조");
+            if (uk > 0) sb.append(" ").append(uk).append("억");
+        } else {
+            sb.append(uk).append("억");
+        }
+        return sb.toString();
+    }
+
+    // 비율 포맷팅 (Double -> "12.34배")
+    private String formatRatio(Double value) {
+        if (value == null || value.isNaN()) return "-";
+        return String.format("%.2f배", value);
     }
 }

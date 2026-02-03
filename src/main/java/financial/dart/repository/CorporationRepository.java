@@ -1,5 +1,6 @@
 package financial.dart.repository;
 
+import financial.dart.domain.CorpFinRatio;
 import financial.dart.domain.Corporation;
 import financial.dart.dto.UpcomingDto;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -45,4 +46,19 @@ public interface CorporationRepository extends JpaRepository<Corporation, Long> 
             "FROM Corporation c " +
             "WHERE c.corpCode IN :corpCodes")
     List<UpcomingDto> findAllByCorpCodes(@Param("corpCodes") List<String> corpCodes);
+
+    @Query("SELECT r " +
+            "FROM CorpFinRatio r " +
+            "WHERE r.corporation.id = :corporationId " +
+            "ORDER BY r.bsnsYear ASC")
+    List<CorpFinRatio> findAllByCorporationIds(@Param("corporationId") Long corporationId);
+
+    @Query("SELECT sc.targetCorpId " +
+            "FROM SimilarCorps sc " +
+            "WHERE sc.corpId = :corpId")
+    List<Long> findTargetCorpIdsByCorpId(@Param("corpId") Long corpId);
+
+    // [추가] 여러 기업의 재무비율을 한 번에 조회 (사업연도 오름차순)
+    @Query("SELECT r FROM CorpFinRatio r WHERE r.corporation.id IN :corpIds ORDER BY r.bsnsYear ASC")
+    List<CorpFinRatio> findByCorporationIdInOrderByBsnsYearAsc(@Param("corpIds") List<Long> corpIds);
 }
